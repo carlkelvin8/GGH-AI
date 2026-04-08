@@ -175,9 +175,9 @@ export function SmartFormWizard({ onComplete, onBack }: SmartFormWizardProps) {
   };
 
   return (
-    <div className="max-w-4xl mx-auto p-6">
-      {/* Progress Header */}
-      <div className="mb-8">
+    <div className="flex flex-col h-full max-w-4xl mx-auto">
+      {/* Fixed Progress Header */}
+      <div className="flex-shrink-0 p-6 border-b bg-white/80 backdrop-blur-sm">
         <div className="flex items-center justify-between mb-4">
           <div>
             <h2 className="text-2xl font-bold text-slate-900">Create Your Proposal</h2>
@@ -216,22 +216,25 @@ export function SmartFormWizard({ onComplete, onBack }: SmartFormWizardProps) {
         </div>
       </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-        {/* Main Form */}
-        <div className="lg:col-span-2">
-          <Card className="border-none shadow-xl">
-            <CardHeader className="pb-4">
-              <div className="flex items-center gap-3">
-                <div className="p-2 bg-primary/10 rounded-lg">
-                  {currentStepData.icon}
-                </div>
-                <div>
-                  <CardTitle className="text-xl">{currentStepData.title}</CardTitle>
-                  <p className="text-slate-600 text-sm mt-1">{currentStepData.description}</p>
-                </div>
-              </div>
-            </CardHeader>
-            <CardContent className="space-y-6">
+      {/* Scrollable Content Area */}
+      <div className="flex-1 overflow-y-auto custom-scrollbar">
+        <div className="p-6">
+          <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+            {/* Main Form */}
+            <div className="lg:col-span-2">
+              <Card className="border-none shadow-xl">
+                <CardHeader className="pb-4">
+                  <div className="flex items-center gap-3">
+                    <div className="p-2 bg-primary/10 rounded-lg">
+                      {currentStepData.icon}
+                    </div>
+                    <div>
+                      <CardTitle className="text-xl">{currentStepData.title}</CardTitle>
+                      <p className="text-slate-600 text-sm mt-1">{currentStepData.description}</p>
+                    </div>
+                  </div>
+                </CardHeader>
+                <CardContent className="space-y-6">
               {/* Step 1: Client Information */}
               {currentStep === 0 && (
                 <div className="space-y-6">
@@ -391,173 +394,178 @@ export function SmartFormWizard({ onComplete, onBack }: SmartFormWizardProps) {
                   </div>
                 </div>
               )}
-            </CardContent>
-          </Card>
-        </div>
+                </CardContent>
+              </Card>
+            </div>
 
-        {/* Sidebar with Tips and Progress */}
-        <div className="space-y-6">
-          {/* Tips Card */}
-          <Card className="border-none shadow-lg bg-gradient-to-br from-amber-50 to-orange-50">
-            <CardContent className="p-6">
-              <div className="flex items-center gap-2 mb-4">
-                <Lightbulb className="w-5 h-5 text-amber-600" />
-                <h3 className="font-semibold text-amber-900">Pro Tips</h3>
-              </div>
-              <div className="space-y-3">
-                {currentStepData.tips.map((tip, index) => (
-                  <div key={index} className="flex items-start gap-2">
-                    <div className="w-1.5 h-1.5 bg-amber-500 rounded-full mt-2 flex-shrink-0" />
-                    <p className="text-sm text-amber-800">{tip}</p>
+            {/* Sidebar with Tips and Progress */}
+            <div className="lg:col-span-1 space-y-6">
+              {/* Tips Card */}
+              <Card className="border-none shadow-lg bg-gradient-to-br from-amber-50 to-orange-50">
+                <CardContent className="p-6">
+                  <div className="flex items-center gap-2 mb-4">
+                    <Lightbulb className="w-5 h-5 text-amber-600" />
+                    <h3 className="font-semibold text-amber-900">Pro Tips</h3>
                   </div>
-                ))}
-              </div>
-            </CardContent>
-          </Card>
+                  <div className="space-y-3">
+                    {currentStepData.tips.map((tip, index) => (
+                      <div key={index} className="flex items-start gap-2">
+                        <div className="w-1.5 h-1.5 bg-amber-500 rounded-full mt-2 flex-shrink-0" />
+                        <p className="text-sm text-amber-800">{tip}</p>
+                      </div>
+                    ))}
+                  </div>
+                </CardContent>
+              </Card>
 
-          {/* Validation Status */}
-          <Card className="border-none shadow-lg">
-            <CardContent className="p-6">
-              <div className="flex items-center gap-2 mb-4">
-                {isStepValid() ? (
-                  <CheckCircle2 className="w-5 h-5 text-emerald-600" />
-                ) : (
-                  <AlertCircle className="w-5 h-5 text-amber-600" />
-                )}
-                <h3 className="font-semibold text-slate-900">Step Status</h3>
-              </div>
-              <p className="text-sm text-slate-600 mb-4">
-                {isStepValid() 
-                  ? "All required fields completed! Ready to continue."
-                  : "Please complete all required fields to proceed."
-                }
-              </p>
-              <div className="space-y-2">
-                {/* Step 1: Client Info */}
-                {currentStep === 0 && (
-                  <>
-                    <div className="flex items-center gap-2">
-                      {formData.clientName.trim() ? (
-                        <CheckCircle2 className="w-4 h-4 text-emerald-500" />
-                      ) : (
-                        <div className="w-4 h-4 border-2 border-slate-300 rounded-full" />
-                      )}
-                      <span className="text-sm text-slate-600">Client Name</span>
-                      <span className="text-xs text-red-500">*</span>
-                    </div>
-                    <div className="flex items-center gap-2">
-                      {formData.projectTitle.trim() ? (
-                        <CheckCircle2 className="w-4 h-4 text-emerald-500" />
-                      ) : (
-                        <div className="w-4 h-4 border-2 border-slate-300 rounded-full" />
-                      )}
-                      <span className="text-sm text-slate-600">Project Title</span>
-                      <span className="text-xs text-red-500">*</span>
-                    </div>
-                  </>
-                )}
-                
-                {/* Step 2: Project Scope */}
-                {currentStep === 1 && (
-                  <>
-                    <div className="flex items-center gap-2">
-                      {formData.budgetRange.trim() ? (
-                        <CheckCircle2 className="w-4 h-4 text-emerald-500" />
-                      ) : (
-                        <div className="w-4 h-4 border-2 border-slate-300 rounded-full" />
-                      )}
-                      <span className="text-sm text-slate-600">Budget Range</span>
-                      <span className="text-xs text-red-500">*</span>
-                    </div>
-                    <div className="flex items-center gap-2">
-                      {formData.timeline.trim() ? (
-                        <CheckCircle2 className="w-4 h-4 text-emerald-500" />
-                      ) : (
-                        <div className="w-4 h-4 border-2 border-slate-300 rounded-full" />
-                      )}
-                      <span className="text-sm text-slate-600">Timeline</span>
-                      <span className="text-xs text-red-500">*</span>
-                    </div>
-                    <div className="flex items-center gap-2">
-                      {formData.industry.trim() ? (
-                        <CheckCircle2 className="w-4 h-4 text-emerald-500" />
-                      ) : (
-                        <div className="w-4 h-4 border-2 border-slate-200 rounded-full" />
-                      )}
-                      <span className="text-sm text-slate-500">Industry</span>
-                      <span className="text-xs text-slate-400">(optional)</span>
-                    </div>
-                    <div className="flex items-center gap-2">
-                      {formData.projectType.trim() ? (
-                        <CheckCircle2 className="w-4 h-4 text-emerald-500" />
-                      ) : (
-                        <div className="w-4 h-4 border-2 border-slate-200 rounded-full" />
-                      )}
-                      <span className="text-sm text-slate-500">Project Type</span>
-                      <span className="text-xs text-slate-400">(optional)</span>
-                    </div>
-                  </>
-                )}
-                
-                {/* Step 3: Requirements */}
-                {currentStep === 2 && (
-                  <div className="flex items-center gap-2">
-                    {formData.requirements.some(req => req.title.trim() && req.description.trim()) ? (
-                      <CheckCircle2 className="w-4 h-4 text-emerald-500" />
+              {/* Validation Status */}
+              <Card className="border-none shadow-lg">
+                <CardContent className="p-6">
+                  <div className="flex items-center gap-2 mb-4">
+                    {isStepValid() ? (
+                      <CheckCircle2 className="w-5 h-5 text-emerald-600" />
                     ) : (
-                      <div className="w-4 h-4 border-2 border-slate-300 rounded-full" />
+                      <AlertCircle className="w-5 h-5 text-amber-600" />
                     )}
-                    <span className="text-sm text-slate-600">At least one complete requirement</span>
-                    <span className="text-xs text-red-500">*</span>
+                    <h3 className="font-semibold text-slate-900">Step Status</h3>
                   </div>
-                )}
-              </div>
-            </CardContent>
-          </Card>
+                  <p className="text-sm text-slate-600 mb-4">
+                    {isStepValid() 
+                      ? "All required fields completed! Ready to continue."
+                      : "Please complete all required fields to proceed."
+                    }
+                  </p>
+                  <div className="space-y-2">
+                    {/* Step 1: Client Info */}
+                    {currentStep === 0 && (
+                      <>
+                        <div className="flex items-center gap-2">
+                          {formData.clientName.trim() ? (
+                            <CheckCircle2 className="w-4 h-4 text-emerald-500" />
+                          ) : (
+                            <div className="w-4 h-4 border-2 border-slate-300 rounded-full" />
+                          )}
+                          <span className="text-sm text-slate-600">Client Name</span>
+                          <span className="text-xs text-red-500">*</span>
+                        </div>
+                        <div className="flex items-center gap-2">
+                          {formData.projectTitle.trim() ? (
+                            <CheckCircle2 className="w-4 h-4 text-emerald-500" />
+                          ) : (
+                            <div className="w-4 h-4 border-2 border-slate-300 rounded-full" />
+                          )}
+                          <span className="text-sm text-slate-600">Project Title</span>
+                          <span className="text-xs text-red-500">*</span>
+                        </div>
+                      </>
+                    )}
+                    
+                    {/* Step 2: Project Scope */}
+                    {currentStep === 1 && (
+                      <>
+                        <div className="flex items-center gap-2">
+                          {formData.budgetRange.trim() ? (
+                            <CheckCircle2 className="w-4 h-4 text-emerald-500" />
+                          ) : (
+                            <div className="w-4 h-4 border-2 border-slate-300 rounded-full" />
+                          )}
+                          <span className="text-sm text-slate-600">Budget Range</span>
+                          <span className="text-xs text-red-500">*</span>
+                        </div>
+                        <div className="flex items-center gap-2">
+                          {formData.timeline.trim() ? (
+                            <CheckCircle2 className="w-4 h-4 text-emerald-500" />
+                          ) : (
+                            <div className="w-4 h-4 border-2 border-slate-300 rounded-full" />
+                          )}
+                          <span className="text-sm text-slate-600">Timeline</span>
+                          <span className="text-xs text-red-500">*</span>
+                        </div>
+                        <div className="flex items-center gap-2">
+                          {formData.industry.trim() ? (
+                            <CheckCircle2 className="w-4 h-4 text-emerald-500" />
+                          ) : (
+                            <div className="w-4 h-4 border-2 border-slate-200 rounded-full" />
+                          )}
+                          <span className="text-sm text-slate-500">Industry</span>
+                          <span className="text-xs text-slate-400">(optional)</span>
+                        </div>
+                        <div className="flex items-center gap-2">
+                          {formData.projectType.trim() ? (
+                            <CheckCircle2 className="w-4 h-4 text-emerald-500" />
+                          ) : (
+                            <div className="w-4 h-4 border-2 border-slate-200 rounded-full" />
+                          )}
+                          <span className="text-sm text-slate-500">Project Type</span>
+                          <span className="text-xs text-slate-400">(optional)</span>
+                        </div>
+                      </>
+                    )}
+                    
+                    {/* Step 3: Requirements */}
+                    {currentStep === 2 && (
+                      <div className="flex items-center gap-2">
+                        {formData.requirements.some(req => req.title.trim() && req.description.trim()) ? (
+                          <CheckCircle2 className="w-4 h-4 text-emerald-500" />
+                        ) : (
+                          <div className="w-4 h-4 border-2 border-slate-300 rounded-full" />
+                        )}
+                        <span className="text-sm text-slate-600">At least one complete requirement</span>
+                        <span className="text-xs text-red-500">*</span>
+                      </div>
+                    )}
+                  </div>
+                </CardContent>
+              </Card>
+            </div>
+          </div>
         </div>
       </div>
 
-      {/* Navigation */}
-      <div className="flex items-center justify-between mt-8 pt-6 border-t">
-        <Button
-          onClick={handlePrevious}
-          variant="outline"
-          className="flex items-center gap-2"
-        >
-          <ChevronLeft className="w-4 h-4" />
-          {currentStep === 0 ? 'Back to Welcome' : 'Previous'}
-        </Button>
-
-        <div className="flex items-center gap-4">
-          <span className="text-sm text-slate-500">
-            {completedSteps.size} of {steps.length} steps completed
-          </span>
-          {/* Debug info */}
-          <span className="text-xs text-slate-400">
-            Step {currentStep + 1} valid: {isStepValid() ? '✅' : '❌'}
-          </span>
-        </div>
+      {/* Fixed Navigation Footer */}
+      <div className="flex-shrink-0 border-t bg-white/90 backdrop-blur-sm p-6">
+        <div className="flex items-center justify-between">
           <Button
-            onClick={handleNext}
-            disabled={!isStepValid()}
-            className={`flex items-center gap-2 ${
-              !isStepValid() 
-                ? 'opacity-50 cursor-not-allowed' 
-                : 'hover:scale-105 transition-transform'
-            }`}
+            onClick={handlePrevious}
+            variant="outline"
+            className="flex items-center gap-2"
           >
-            {currentStep === steps.length - 1 ? (
-              <>
-                <Wand2 className="w-4 h-4" />
-                Generate Proposal
-              </>
-            ) : (
-              <>
-                Next
-                <ChevronRight className="w-4 h-4" />
-              </>
-            )}
+            <ChevronLeft className="w-4 h-4" />
+            {currentStep === 0 ? 'Back to Welcome' : 'Previous'}
           </Button>
+
+          <div className="flex items-center gap-4">
+            <span className="text-sm text-slate-500">
+              {completedSteps.size} of {steps.length} steps completed
+            </span>
+            {/* Debug info */}
+            <span className="text-xs text-slate-400">
+              Step {currentStep + 1} valid: {isStepValid() ? '✅' : '❌'}
+            </span>
+          </div>
+          <div>
+            <Button
+              onClick={handleNext}
+              disabled={!isStepValid()}
+              className={`flex items-center gap-2 ${
+                !isStepValid() 
+                  ? 'opacity-50 cursor-not-allowed' 
+                  : 'hover:scale-105 transition-transform'
+              }`}
+            >
+              {currentStep === steps.length - 1 ? (
+                <>
+                  <Wand2 className="w-4 h-4" />
+                  Generate Proposal
+                </>
+              ) : (
+                <>
+                  Next
+                  <ChevronRight className="w-4 h-4" />
+                </>
+              )}
+            </Button>
+          </div>
         </div>
       </div>
     </div>

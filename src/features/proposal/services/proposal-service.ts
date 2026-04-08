@@ -149,14 +149,43 @@ export class ProposalService {
   }
 
   /**
-   * Simulates sending the proposal to a client.
+   * Sends the proposal to a client via email.
    */
-  static async sendToClient(proposalId: string): Promise<void> {
-    // Simulate network delay
-    await new Promise((resolve) => setTimeout(resolve, 1500));
-    
-    // In a real app, this would be an API call
-    console.log(`Proposal ${proposalId} sent to client successfully.`);
+  static async sendToClient(
+    proposalId: string, 
+    clientEmail: string, 
+    clientName: string, 
+    projectTitle: string,
+    message?: string,
+    includeAttachment: boolean = true
+  ): Promise<void> {
+    try {
+      const response = await fetch('/api/v1/proposals/send-to-client', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          proposalId,
+          clientEmail,
+          clientName,
+          projectTitle,
+          message,
+          includeAttachment,
+        }),
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({}));
+        throw new Error(errorData.error || `Failed to send email: ${response.statusText}`);
+      }
+
+      const result = await response.json();
+      console.log('Email sent successfully:', result);
+    } catch (error) {
+      console.error('ProposalService.sendToClient failed:', error);
+      throw error;
+    }
   }
 
   /**

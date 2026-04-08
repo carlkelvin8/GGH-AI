@@ -48,7 +48,10 @@ export function WelcomeScreen({ onGetStarted, onSkip }: WelcomeScreenProps) {
   const currentStepData = steps[currentStep];
 
   return (
-    <div className="min-h-[600px] flex items-center justify-center p-8">
+    <div className="flex flex-col h-full">
+      {/* Scrollable Content */}
+      <div className="flex-1 overflow-y-auto custom-scrollbar">
+        <div className="min-h-[600px] flex items-center justify-center p-8">
       <div className="max-w-4xl w-full">
         {/* Header */}
         <div className="text-center mb-12">
@@ -195,7 +198,12 @@ export function WelcomeScreen({ onGetStarted, onSkip }: WelcomeScreenProps) {
           </div>
         </div>
 
-        {/* Action Buttons */}
+        </div>
+      </div>
+      </div>
+
+      {/* Fixed Action Buttons */}
+      <div className="flex-shrink-0 border-t bg-white/90 backdrop-blur-sm p-6">
         <div className="flex items-center justify-center gap-4">
           <Button
             variant="ghost"

@@ -20,12 +20,12 @@ function buildPrompt(input: ProposalInput, templateName: string, sections: strin
     technical: 'Use precise technical language with specific implementation details and terminology.',
   }[input.tone ?? 'formal'];
 
-  return `You are an expert proposal writer for GGH Software Development Services.
+  return `You are an expert proposal writer for GGH Software Development Services, a Philippine-based software development company.
+
 Generate a professional project proposal with EXACTLY these sections in order: ${sections.join(', ')}.
 
 Client: ${input.clientName}
 Project: ${input.projectTitle}
-${input.budgetRange ? `Budget: ${input.budgetRange}` : ''}
 ${input.timeline ? `Timeline: ${input.timeline}` : ''}
 Template style: ${templateName}
 Tone: ${toneGuide}
@@ -33,13 +33,38 @@ Tone: ${toneGuide}
 Requirements:
 ${requirementsList}
 
+PRICING GUIDELINES:
+- You must calculate and include specific pricing in Philippine Pesos (₱)
+- Base pricing range: ₱20,000 to ₱500,000 depending on project complexity
+- Consider these factors for pricing:
+  * Number and complexity of requirements
+  * Priority levels (high priority = more expensive)
+  * Technical complexity and development time
+  * Integration requirements
+  * Custom features vs standard implementations
+- Always include a detailed budget breakdown
+- Offer optional Support & Maintenance packages:
+  * Basic Support: ₱2,000-5,000/month (bug fixes, minor updates)
+  * Premium Support: ₱5,000-10,000/month (priority support, feature updates, monitoring)
+  * Enterprise Support: ₱10,000-20,000/month (24/7 support, dedicated developer, monthly reviews)
+
+IMPORTANT PRICING RULES:
+- Simple projects (1-3 basic requirements): ₱20,000-80,000
+- Medium projects (4-6 requirements with moderate complexity): ₱80,000-200,000
+- Complex projects (7+ requirements, high complexity, integrations): ₱200,000-500,000
+- Always justify the pricing based on the specific requirements provided
+- Include payment terms (e.g., 50% upfront, 50% on completion)
+
 Rules:
 - Return ONLY a JSON object, no markdown fences, no extra text.
 - The JSON must have a "sections" array where each item has "title" (string) and "content" (string).
 - Section titles must match exactly: ${sections.map((s) => `"${s}"`).join(', ')}.
 - Each section content should be 2-4 paragraphs of professional, specific prose.
 - Reference the client name, project title, and requirements naturally throughout.
-- Do not use placeholder text like "Lorem ipsum".`;
+- Include specific peso amounts (₱) in budget-related sections.
+- Always include support and maintenance options as separate line items.
+- Do not use placeholder text like "Lorem ipsum" or "TBD".
+- Make pricing realistic and competitive for the Philippine market.`;
 }
 
 export async function POST(request: Request) {

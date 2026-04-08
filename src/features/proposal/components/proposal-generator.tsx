@@ -75,7 +75,7 @@ import { cn } from '@/shared/lib/utils';
 
 /**
  * Proposal Generator Component.
- * AI-powered tool to generate professional project proposals.
+ * Generate project proposals for clients.
  */
 export function ProposalGenerator() {
   const { 
@@ -119,6 +119,12 @@ export function ProposalGenerator() {
   const autoSaveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const DRAFT_KEY = 'ggh-proposal-draft';
 
+  // Email sending state
+  const [showEmailDialog, setShowEmailDialog] = useState(false);
+  const [clientEmail, setClientEmail] = useState('');
+  const [emailMessage, setEmailMessage] = useState('');
+  const [includeAttachment, setIncludeAttachment] = useState(true);
+
   // Simulate loading for history tab on mount
   useEffect(() => {
     const timer = setTimeout(() => setHistoryLoading(false), 800);
@@ -160,7 +166,15 @@ export function ProposalGenerator() {
       if (typeof window !== 'undefined') {
         try {
           const saved = localStorage.getItem(DRAFT_KEY);
-          if (saved) return JSON.parse(saved) as ProposalInput;
+          if (saved) {
+            const parsedData = JSON.parse(saved) as ProposalInput;
+            // Ensure all requirements have UUIDs
+            parsedData.requirements = parsedData.requirements.map(req => ({
+              ...req,
+              id: req.id || crypto.randomUUID()
+            }));
+            return parsedData;
+          }
         } catch { /* ignore */ }
       }
       return {
@@ -188,8 +202,35 @@ export function ProposalGenerator() {
     name: 'requirements',
   });
 
+  // Ensure all requirements have UUIDs when component mounts or fields change
+  useEffect(() => {
+    const currentRequirements = watch('requirements');
+    let needsUpdate = false;
+    const updatedRequirements = currentRequirements.map(req => {
+      if (!req.id) {
+        needsUpdate = true;
+        return { ...req, id: crypto.randomUUID() };
+      }
+      return req;
+    });
+    
+    if (needsUpdate) {
+      setValue('requirements', updatedRequirements);
+    }
+  }, [fields, setValue, watch]);
+
   const onSubmit = async (data: ProposalInput) => {
-    const hasValidRequirements = data.requirements.some(r => r.title.trim() && r.description.trim());
+    // Ensure all requirements have valid UUIDs
+    const dataWithUUIDs = {
+      ...data,
+      requirements: data.requirements.map(req => ({
+        ...req,
+        id: req.id || crypto.randomUUID()
+      }))
+    };
+    
+    const hasValidRequirements = dataWithUUIDs.requirements.some(r => r.title.trim() && r.description.trim());
+    
     if (!hasValidRequirements) {
       toast.error('Add at least one complete requirement with a title and description.');
       return;
@@ -198,10 +239,12 @@ export function ProposalGenerator() {
     setGenerating(true);
     setCurrentStep('Initializing OpenClaw Agent...');
     try {
-      const payload = { ...data, tone, customSections: customSections.length > 0 ? customSections : undefined };
+      const payload = { ...dataWithUUIDs, tone, customSections: customSections.length > 0 ? customSections : undefined };
+      
       const proposal = await ProposalService.openClawGenerate(payload, (step) => {
         setCurrentStep(step);
       });
+      
       setProposal(proposal);
       addToHistory(proposal);
       ProposalService.saveToDb(proposal).catch(() => {});
@@ -235,14 +278,31 @@ export function ProposalGenerator() {
   };
 
   const handleSendToClient = async () => {
-    if (!currentProposal) return;
+    if (!currentProposal || !clientEmail.trim()) {
+      toast.error('Please enter the client\'s email address.');
+      return;
+    }
+
     setIsSending(true);
-    const toastId = toast.loading('Sending to client…');
+    const toastId = toast.loading('Sending proposal to client…');
+    
     try {
-      await ProposalService.sendToClient(currentProposal.id);
-      toast.success('Sent to client.', { id: toastId });
-    } catch {
-      toast.error('Failed to send.', { id: toastId });
+      await ProposalService.sendToClient(
+        currentProposal.id,
+        clientEmail.trim(),
+        currentProposal.input.clientName,
+        currentProposal.input.projectTitle,
+        emailMessage.trim() || undefined,
+        includeAttachment
+      );
+      
+      toast.success('Proposal sent to client successfully!', { id: toastId });
+      setShowEmailDialog(false);
+      setClientEmail('');
+      setEmailMessage('');
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'Failed to send proposal';
+      toast.error(message, { id: toastId });
     } finally {
       setIsSending(false);
     }
@@ -414,7 +474,7 @@ export function ProposalGenerator() {
               <div className="w-px h-6 bg-slate-200" />
               <div>
                 <h2 className="text-2xl font-bold text-slate-900">Proposal Generator</h2>
-                <p className="text-slate-600">Create professional proposals with AI assistance</p>
+                <p className="text-slate-600">Generate client proposals</p>
               </div>
             </div>
             
@@ -456,14 +516,11 @@ export function ProposalGenerator() {
                 <CardHeader className="p-8 border-b bg-linear-to-br from-white to-slate-50/50">
                   <div className="flex justify-between items-start">
                     <div>
-                      <CardTitle className="text-2xl font-black">Project Context</CardTitle>
+                      <CardTitle className="text-2xl font-black">Project Details</CardTitle>
                       <CardDescription className="text-base font-medium">
-                        Provide the foundational details for your AI-generated proposal.
+                        Enter project information and requirements.
                       </CardDescription>
                     </div>
-                    <Badge variant="outline" className="bg-primary/5 text-primary border-primary/20 font-bold">
-                      Powered by OpenClaw Engine
-                    </Badge>
                   </div>
                 </CardHeader>
                 <CardContent className="p-8">
@@ -496,38 +553,28 @@ export function ProposalGenerator() {
                       </div>
                     </div>
 
-                    {/* Budget & Timeline */}
-                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-6 sm:gap-8">
-                      <div className="space-y-3">
-                        <Label htmlFor="budgetRange" className="text-sm font-bold flex items-center gap-2 text-slate-700">
-                          <DollarSign className="w-4 h-4 text-primary" /> Budget Range
-                        </Label>
-                        <Input 
-                          id="budgetRange" 
-                          {...register('budgetRange')} 
-                          placeholder="e.g. $50k - $100k" 
-                          className="h-12 px-4 rounded-xl border-slate-200"
-                        />
-                      </div>
-                      <div className="space-y-3">
-                        <Label htmlFor="timeline" className="text-sm font-bold flex items-center gap-2 text-slate-700">
-                          <Clock className="w-4 h-4 text-primary" /> Timeline
-                        </Label>
-                        <Input 
-                          id="timeline" 
-                          {...register('timeline')} 
-                          placeholder="e.g. 6 months" 
-                          className="h-12 px-4 rounded-xl border-slate-200"
-                        />
-                      </div>
+                    {/* Timeline */}
+                    <div className="space-y-3">
+                      <Label htmlFor="timeline" className="text-sm font-bold flex items-center gap-2 text-slate-700">
+                        <Clock className="w-4 h-4 text-primary" /> Timeline (Optional)
+                      </Label>
+                      <Input 
+                        id="timeline" 
+                        {...register('timeline')} 
+                        placeholder="e.g. 6 months" 
+                        className="h-12 px-4 rounded-xl border-slate-200"
+                      />
+                      <p className="text-xs text-slate-500 font-medium">
+                        Leave blank if you want our AI to suggest an optimal timeline based on your requirements.
+                      </p>
                     </div>
 
                     {/* Template Selection */}
                     <div className="space-y-6">
                       <div className="flex items-center justify-between">
-                        <Label className="text-lg font-black text-slate-900">Select Proposal Template</Label>
+                        <Label className="text-lg font-black text-slate-900">Template</Label>
                         <Badge variant="outline" className="text-[10px] font-bold uppercase tracking-wider text-slate-500 border-slate-200">
-                          {PROPOSAL_TEMPLATES.length} Designs Available
+                          {PROPOSAL_TEMPLATES.length} Available
                         </Badge>
                       </div>
                       <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
@@ -608,7 +655,7 @@ export function ProposalGenerator() {
                     {/* Requirements Section */}
                     <div className="space-y-6">
                       <div className="flex items-center justify-between">
-                        <Label className="text-lg font-black text-slate-900">Project Requirements</Label>
+                        <Label className="text-lg font-black text-slate-900">Requirements</Label>
                         <Button
                           type="button"
                           variant="outline"
@@ -647,6 +694,11 @@ export function ProposalGenerator() {
                                 placeholder="Describe the specific need or outcome..."
                                 className="min-h-[80px] border-none bg-transparent resize-none text-slate-600 placeholder:text-slate-400 focus-visible:ring-0 px-0"
                               />
+                              {/* Hidden ID field - ensure it's properly registered */}
+                              <input
+                                type="hidden"
+                                {...register(`requirements.${index}.id` as const)}
+                              />
                               {/* Priority selector */}
                               <div className="flex gap-2">
                                 {(['low', 'medium', 'high'] as const).map((p) => {
@@ -678,12 +730,12 @@ export function ProposalGenerator() {
 
                     {/* Tone Selector */}
                     <div className="space-y-4">
-                      <Label className="text-lg font-black text-slate-900">Writing Tone</Label>
+                      <Label className="text-lg font-black text-slate-900">Tone</Label>
                       <div className="flex gap-3">
                         {([
-                          { value: 'formal', label: 'Formal', desc: 'Executive-ready' },
-                          { value: 'casual', label: 'Casual', desc: 'Approachable' },
-                          { value: 'technical', label: 'Technical', desc: 'Detail-focused' },
+                          { value: 'formal', label: 'Formal', desc: 'Professional' },
+                          { value: 'casual', label: 'Casual', desc: 'Friendly' },
+                          { value: 'technical', label: 'Technical', desc: 'Detailed' },
                         ] as const).map((t) => (
                           <button
                             key={t.value}
@@ -708,7 +760,7 @@ export function ProposalGenerator() {
                       <div className="flex items-center justify-between">
                         <div>
                           <Label className="text-lg font-black text-slate-900">Custom Sections</Label>
-                          <p className="text-xs text-slate-400 font-medium mt-0.5">Override template sections with your own</p>
+                          <p className="text-xs text-slate-400 font-medium mt-0.5">Add custom sections (optional)</p>
                         </div>
                         {customSections.length > 0 && (
                           <button
@@ -808,37 +860,31 @@ export function ProposalGenerator() {
             <div className="lg:col-span-4 space-y-8">
               <Card className="border-none shadow-xl shadow-slate-200/50 rounded-3xl bg-primary text-white overflow-hidden">
                 <CardHeader className="p-8">
-                  <CardTitle className="text-2xl font-black">AI Assistance</CardTitle>
+                  <CardTitle className="text-2xl font-black">Auto Pricing</CardTitle>
                 </CardHeader>
                 <CardContent className="p-8 pt-0 space-y-6 text-primary-foreground/90 font-medium">
-                  <p>Our engine will generate a comprehensive proposal including:</p>
+                  <p>Pricing calculated automatically based on requirements:</p>
                   <ul className="space-y-4">
                     <li className="flex items-center gap-3">
-                      <div className="w-6 h-6 rounded-full bg-white/20 flex items-center justify-center text-xs font-bold">1</div>
-                      Executive Summary
+                      <div className="w-6 h-6 rounded-full bg-white/20 flex items-center justify-center text-xs font-bold">₱</div>
+                      ₱20,000 to ₱500,000 range
                     </li>
                     <li className="flex items-center gap-3">
-                      <div className="w-6 h-6 rounded-full bg-white/20 flex items-center justify-center text-xs font-bold">2</div>
-                      Strategic Scope of Work
+                      <div className="w-6 h-6 rounded-full bg-white/20 flex items-center justify-center text-xs font-bold">📊</div>
+                      Budget breakdown included
                     </li>
                     <li className="flex items-center gap-3">
-                      <div className="w-6 h-6 rounded-full bg-white/20 flex items-center justify-center text-xs font-bold">3</div>
-                      Implementation Timeline
-                    </li>
-                    <li className="flex items-center gap-3">
-                      <div className="w-6 h-6 rounded-full bg-white/20 flex items-center justify-center text-xs font-bold">4</div>
-                      Budgetary Allocation
+                      <div className="w-6 h-6 rounded-full bg-white/20 flex items-center justify-center text-xs font-bold">🛠️</div>
+                      Support & maintenance options
                     </li>
                   </ul>
                 </CardContent>
               </Card>
 
               <div className="p-8 bg-blue-50/50 rounded-3xl border border-blue-100/50 space-y-4">
-                <h4 className="font-black text-blue-900 flex items-center gap-2">
-                  <Sparkles className="w-4 h-4" /> OpenClaw Pro Tip
-                </h4>
+                <h4 className="font-black text-blue-900">Tip</h4>
                 <p className="text-blue-700/80 text-sm font-medium leading-relaxed">
-                  The OpenClaw agent works best with specific requirements! The more detail you provide, the more tailored and effective the generated proposal will be.
+                  More detailed requirements = more accurate pricing and timeline estimates.
                 </p>
               </div>
             </div>
@@ -1065,21 +1111,103 @@ export function ProposalGenerator() {
                       )}
                       Export PDF
                     </Button>
-                    <Button 
-                      className={cn(
-                        "h-12 px-6 rounded-xl font-bold text-white shadow-lg transition-all",
-                        "bg-slate-900 hover:bg-slate-800"
-                      )}
-                      onClick={handleSendToClient}
-                      disabled={isSending}
-                    >
-                      {isSending ? (
-                        <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                      ) : (
-                        <Send className="w-4 h-4 mr-2" />
-                      )}
-                      Send to Client
-                    </Button>
+                    <Dialog open={showEmailDialog} onOpenChange={setShowEmailDialog}>
+                      <DialogTrigger asChild>
+                        <Button 
+                          className={cn(
+                            "h-12 px-6 rounded-xl font-bold text-white shadow-lg transition-all",
+                            "bg-slate-900 hover:bg-slate-800"
+                          )}
+                          onClick={() => {
+                            // Pre-populate with a suggested email if not already set
+                            if (!clientEmail && currentProposal) {
+                              const suggestedEmail = currentProposal.input.clientName.toLowerCase().replace(/\s+/g, '.') + '@example.com';
+                              setClientEmail('');
+                            }
+                          }}
+                        >
+                          <Send className="w-4 h-4 mr-2" />
+                          Send to Client
+                        </Button>
+                      </DialogTrigger>
+                      <DialogContent className="max-w-md rounded-3xl">
+                        <DialogHeader>
+                          <DialogTitle className="text-2xl font-black">Send to Client</DialogTitle>
+                          <DialogDescription>
+                            Send this proposal directly to your client via email.
+                          </DialogDescription>
+                        </DialogHeader>
+                        <div className="space-y-6 py-4">
+                          <div className="space-y-3">
+                            <Label htmlFor="client-email" className="text-sm font-bold">
+                              Client Email Address
+                            </Label>
+                            <Input
+                              id="client-email"
+                              type="email"
+                              placeholder={`${currentProposal?.input.clientName.toLowerCase().replace(/\s+/g, '.')}@company.com`}
+                              value={clientEmail}
+                              onChange={(e) => setClientEmail(e.target.value)}
+                              className="rounded-xl"
+                              required
+                            />
+                          </div>
+                          
+                          <div className="space-y-3">
+                            <Label htmlFor="email-message" className="text-sm font-bold">
+                              Personal Message (Optional)
+                            </Label>
+                            <Textarea
+                              id="email-message"
+                              placeholder="Add a personal note to accompany the proposal..."
+                              value={emailMessage}
+                              onChange={(e) => setEmailMessage(e.target.value)}
+                              className="rounded-xl min-h-[100px]"
+                            />
+                          </div>
+                          
+                          <div className="flex items-center space-x-3">
+                            <input
+                              type="checkbox"
+                              id="include-attachment"
+                              checked={includeAttachment}
+                              onChange={(e) => setIncludeAttachment(e.target.checked)}
+                              className="w-4 h-4 text-primary border-slate-300 rounded focus:ring-primary"
+                            />
+                            <Label htmlFor="include-attachment" className="text-sm cursor-pointer">
+                              Include PDF attachment
+                            </Label>
+                          </div>
+                          
+                          <div className="flex gap-3 pt-4">
+                            <Button
+                              variant="outline"
+                              onClick={() => setShowEmailDialog(false)}
+                              className="flex-1 rounded-xl"
+                            >
+                              Cancel
+                            </Button>
+                            <Button
+                              onClick={handleSendToClient}
+                              disabled={isSending || !clientEmail.trim()}
+                              className="flex-1 rounded-xl bg-primary font-bold"
+                            >
+                              {isSending ? (
+                                <>
+                                  <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                                  Sending...
+                                </>
+                              ) : (
+                                <>
+                                  <Send className="w-4 h-4 mr-2" />
+                                  Send Email
+                                </>
+                              )}
+                            </Button>
+                          </div>
+                        </div>
+                      </DialogContent>
+                    </Dialog>
                   </div>
                 </div>
               </CardHeader>
@@ -1291,7 +1419,7 @@ export function ProposalGenerator() {
               </CardContent>
               <CardFooter className="p-8 border-t bg-slate-50/30 flex justify-center">
                 <p className="text-sm text-slate-400 font-bold">
-                  Generated by GGH Proposal AI &bull; {new Date(currentProposal.generatedAt).toLocaleDateString()}
+                  GGH Software Development Services &bull; {new Date(currentProposal.generatedAt).toLocaleDateString()}
                 </p>
               </CardFooter>
             </Card>
@@ -1304,7 +1432,7 @@ export function ProposalGenerator() {
               <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-6">
                 <div>
                   <CardTitle className="text-2xl font-black">Generation History</CardTitle>
-                  <CardDescription className="text-base font-medium">Review and manage your previously generated proposals.</CardDescription>
+                  <CardDescription className="text-base font-medium">Previous proposals.</CardDescription>
                 </div>
                 <div className="flex gap-3 w-full md:w-auto">
                   {selectedIds.size > 0 && (

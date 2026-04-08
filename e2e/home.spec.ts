@@ -26,8 +26,11 @@ test.describe('Home Page', () => {
     const ctaButton = page.getByRole('button', { name: /generate your next proposal/i });
     await ctaButton.click();
     
-    await expect(page.getByText('AI Proposal Engine')).toBeVisible();
-    await expect(page.getByText('Project Context')).toBeVisible();
+    // Check for the modal header (more specific selector)
+    await expect(page.getByRole('heading', { name: 'AI Proposal Engine' })).toBeVisible();
+    
+    // Check for welcome screen content
+    await expect(page.getByText('Create Winning Proposals in Minutes')).toBeVisible();
   });
 
   test('should have accessible navigation', async ({ page }) => {

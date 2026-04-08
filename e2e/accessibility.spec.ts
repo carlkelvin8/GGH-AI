@@ -39,6 +39,21 @@ test.describe('Accessibility Tests', () => {
     const ctaButton = page.getByRole('button', { name: /generate your next proposal/i });
     await ctaButton.click();
     
+    // Skip the welcome screen to get to the generator
+    const skipButton = page.getByRole('button', { name: /skip introduction/i });
+    if (await skipButton.isVisible()) {
+      await skipButton.click();
+    } else {
+      // If no skip button, try the "Start Creating" button
+      const startButton = page.getByRole('button', { name: /start creating/i });
+      if (await startButton.isVisible()) {
+        await startButton.click();
+      }
+    }
+    
+    // Wait for generator interface to be visible
+    await expect(page.getByText('Project Details')).toBeVisible();
+    
     // Check that all inputs have associated labels
     const clientNameInput = page.getByLabel(/client name/i);
     await expect(clientNameInput).toBeVisible();
@@ -58,6 +73,7 @@ test.describe('Accessibility Tests', () => {
     // Press Enter to activate
     await page.keyboard.press('Enter');
     
-    await expect(page.getByText('AI Proposal Engine')).toBeVisible();
+    // Check for the modal header (more specific selector)
+    await expect(page.getByRole('heading', { name: 'AI Proposal Engine' })).toBeVisible();
   });
 });

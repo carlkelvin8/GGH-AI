@@ -9,7 +9,7 @@ export const PROPOSAL_TEMPLATES: ProposalTemplate[] = [
     name: 'Modern GGH',
     description: 'A sleek, balanced layout with subtle gradients and clear typography. Best for tech startups.',
     style: 'modern',
-    sections: ['Executive Summary', 'Strategic Scope', 'Implementation Timeline', 'Investment Details'],
+    sections: ['Executive Summary', 'Strategic Scope', 'Implementation Timeline', 'Investment Details', 'Support & Maintenance'],
     config: {
       primaryColor: '#3b82f6', // blue-500
       layoutType: 'standard',
@@ -22,7 +22,7 @@ export const PROPOSAL_TEMPLATES: ProposalTemplate[] = [
     name: 'Enterprise Executive',
     description: 'A formal, high-fidelity structure with emphasis on security and standards. Best for corporate clients.',
     style: 'enterprise',
-    sections: ['Executive Overview', 'Technical Architecture', 'Risk Mitigation', 'Budgetary Allocation', 'Next Steps'],
+    sections: ['Executive Overview', 'Technical Architecture', 'Risk Mitigation', 'Budgetary Allocation', 'Ongoing Support Services', 'Next Steps'],
     config: {
       primaryColor: '#0f172a', // slate-900
       layoutType: 'wide',
@@ -35,7 +35,7 @@ export const PROPOSAL_TEMPLATES: ProposalTemplate[] = [
     name: 'Minimalist Clean',
     description: 'A focused, distraction-free layout that lets the requirements speak for themselves.',
     style: 'minimal',
-    sections: ['Overview', 'Deliverables', 'Timeline', 'Cost'],
+    sections: ['Overview', 'Deliverables', 'Timeline', 'Cost', 'Support Options'],
     config: {
       primaryColor: '#1e293b', // slate-800
       layoutType: 'standard',
@@ -48,7 +48,7 @@ export const PROPOSAL_TEMPLATES: ProposalTemplate[] = [
     name: 'Creative Partner',
     description: 'A bold, high-contrast design with visual flair. Best for design or marketing-led projects.',
     style: 'creative',
-    sections: ['The Vision', 'Creative Roadmap', 'Milestones', 'Commercials'],
+    sections: ['The Vision', 'Creative Roadmap', 'Milestones', 'Commercials', 'Partnership Support'],
     config: {
       primaryColor: '#ec4899', // pink-500
       layoutType: 'split',

@@ -173,10 +173,12 @@ export function HomePage() {
                     <div className="absolute top-0 right-0 w-96 h-96 bg-gradient-to-bl from-blue-500/10 to-transparent rounded-full blur-3xl" />
                     <div className="absolute bottom-0 left-0 w-96 h-96 bg-gradient-to-tr from-primary/10 to-transparent rounded-full blur-3xl" />
                     
-                    <div className="relative h-full overflow-y-auto p-8 custom-scrollbar">
-                      <ErrorBoundary>
-                        <ProposalGenerator />
-                      </ErrorBoundary>
+                    <div className="relative h-full overflow-y-auto custom-scrollbar modal-scrollable-content">
+                      <div className="p-8">
+                        <ErrorBoundary>
+                          <ProposalGenerator />
+                        </ErrorBoundary>
+                      </div>
                     </div>
                   </div>
                   
