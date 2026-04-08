@@ -4,6 +4,7 @@ import { useEffect, useState } from 'react';
 import { Terminal, Shield, Zap, Wand2, ArrowRight, Sparkles } from 'lucide-react';
 import { ProposalGenerator } from '@/features/proposal/components/proposal-generator';
 import { ErrorBoundary } from '@/shared/components/error-boundary';
+import { ExamplesModal } from '@/features/proposal/components/examples-modal';
 import {
   Dialog,
   DialogContent,
@@ -46,6 +47,7 @@ function FeatureCard({
  */
 export function HomePage() {
   const [mounted, setMounted] = useState(false);
+  const [showGenerator, setShowGenerator] = useState(false);
 
   useEffect(() => {
     setMounted(true);
@@ -86,7 +88,7 @@ export function HomePage() {
 
           {/* CTAs */}
           <div className="flex flex-col sm:flex-row items-center justify-center gap-6 animate-in fade-in slide-in-from-bottom-12 duration-1000">
-            <Dialog>
+            <Dialog open={showGenerator} onOpenChange={setShowGenerator}>
               <DialogTrigger asChild>
                 <Button
                   size="2xl"
@@ -97,26 +99,117 @@ export function HomePage() {
                   <ArrowRight className="w-5 h-5 ml-3 opacity-50" />
                 </Button>
               </DialogTrigger>
-              <DialogContent className="max-w-6xl h-[95vh] p-0 overflow-hidden border-none shadow-2xl rounded-3xl">
-                <div className="flex flex-col h-full bg-white">
-                  <DialogHeader className="p-8 border-b bg-slate-50/50 backdrop-blur-sm">
-                    <DialogTitle className="text-3xl font-black text-slate-900">AI Proposal Engine</DialogTitle>
-                    <DialogDescription className="text-lg text-slate-500">
-                      Craft high-impact project proposals tailored to your client's unique vision.
-                    </DialogDescription>
+              <DialogContent className="max-w-7xl h-[95vh] p-0 overflow-hidden border-none shadow-2xl rounded-3xl bg-gradient-to-br from-white via-slate-50/30 to-white">
+                <div className="flex flex-col h-full relative">
+                  {/* Enhanced Header with Progress Indicator */}
+                  <DialogHeader className="relative p-8 border-b bg-white/80 backdrop-blur-sm">
+                    {/* Background Pattern */}
+                    <div className="absolute inset-0 bg-gradient-to-r from-primary/5 via-transparent to-blue-500/5" />
+                    <div className="absolute inset-0 bg-[radial-gradient(circle_at_30%_20%,rgba(120,119,198,0.1),transparent_50%)]" />
+                    
+                    <div className="relative flex items-center justify-between">
+                      <div className="space-y-2">
+                        <div className="flex items-center gap-3">
+                          <div className="p-2 bg-primary/10 rounded-xl">
+                            <Wand2 className="w-6 h-6 text-primary" />
+                          </div>
+                          <DialogTitle className="text-3xl font-black text-slate-900 tracking-tight">
+                            AI Proposal Engine
+                          </DialogTitle>
+                          <div className="px-3 py-1 bg-gradient-to-r from-primary to-blue-600 text-white text-xs font-bold rounded-full">
+                            v2.0 OpenClaw
+                          </div>
+                        </div>
+                        <DialogDescription className="text-lg text-slate-600 font-medium max-w-2xl">
+                          Transform your project vision into winning proposals with our advanced AI engine. 
+                          <span className="text-primary font-semibold">Enterprise-grade quality</span> in minutes.
+                        </DialogDescription>
+                      </div>
+                      
+                      {/* Quick Stats */}
+                      <div className="hidden lg:flex items-center gap-6 text-center">
+                        <div className="space-y-1">
+                          <div className="text-2xl font-black text-primary">2.3s</div>
+                          <div className="text-xs font-bold text-slate-500 uppercase tracking-wider">Avg Generation</div>
+                        </div>
+                        <div className="w-px h-12 bg-slate-200" />
+                        <div className="space-y-1">
+                          <div className="text-2xl font-black text-emerald-600">98%</div>
+                          <div className="text-xs font-bold text-slate-500 uppercase tracking-wider">Success Rate</div>
+                        </div>
+                        <div className="w-px h-12 bg-slate-200" />
+                        <div className="space-y-1">
+                          <div className="text-2xl font-black text-amber-600">4.9★</div>
+                          <div className="text-xs font-bold text-slate-500 uppercase tracking-wider">User Rating</div>
+                        </div>
+                      </div>
+                    </div>
+                    
+                    {/* Feature Pills */}
+                    <div className="relative flex flex-wrap gap-2 mt-4">
+                      {[
+                        { icon: '🤖', label: 'AI-Powered', color: 'bg-blue-50 text-blue-700 border-blue-200' },
+                        { icon: '⚡', label: 'Real-time', color: 'bg-amber-50 text-amber-700 border-amber-200' },
+                        { icon: '🎯', label: 'Customizable', color: 'bg-emerald-50 text-emerald-700 border-emerald-200' },
+                        { icon: '📊', label: 'Analytics', color: 'bg-purple-50 text-purple-700 border-purple-200' },
+                        { icon: '🔒', label: 'Enterprise', color: 'bg-slate-50 text-slate-700 border-slate-200' },
+                      ].map((feature, i) => (
+                        <div
+                          key={feature.label}
+                          className={`flex items-center gap-1.5 px-3 py-1.5 rounded-full border text-xs font-bold ${feature.color} animate-in fade-in slide-in-from-left-4`}
+                          style={{ animationDelay: `${i * 100}ms` }}
+                        >
+                          <span>{feature.icon}</span>
+                          <span>{feature.label}</span>
+                        </div>
+                      ))}
+                    </div>
                   </DialogHeader>
-                  <div className="flex-1 overflow-y-auto p-8 custom-scrollbar">
-                    <ErrorBoundary>
-                      <ProposalGenerator />
-                    </ErrorBoundary>
+                  
+                  {/* Enhanced Content Area */}
+                  <div className="flex-1 overflow-hidden relative">
+                    {/* Background Elements */}
+                    <div className="absolute inset-0 bg-gradient-to-br from-transparent via-slate-50/20 to-primary/5" />
+                    <div className="absolute top-0 right-0 w-96 h-96 bg-gradient-to-bl from-blue-500/10 to-transparent rounded-full blur-3xl" />
+                    <div className="absolute bottom-0 left-0 w-96 h-96 bg-gradient-to-tr from-primary/10 to-transparent rounded-full blur-3xl" />
+                    
+                    <div className="relative h-full overflow-y-auto p-8 custom-scrollbar">
+                      <ErrorBoundary>
+                        <ProposalGenerator />
+                      </ErrorBoundary>
+                    </div>
+                  </div>
+                  
+                  {/* Enhanced Footer */}
+                  <div className="border-t bg-white/90 backdrop-blur-sm p-4">
+                    <div className="flex items-center justify-between text-xs">
+                      <div className="flex items-center gap-4 text-slate-500">
+                        <div className="flex items-center gap-1">
+                          <div className="w-2 h-2 bg-green-500 rounded-full animate-pulse" />
+                          <span className="font-medium">AI Engine Online</span>
+                        </div>
+                        <span>•</span>
+                        <span>Powered by OpenClaw v4.0</span>
+                        <span>•</span>
+                        <span>Enterprise Security</span>
+                      </div>
+                      <div className="flex items-center gap-2 text-slate-400">
+                        <kbd className="px-2 py-1 bg-slate-100 rounded text-xs font-mono">Ctrl</kbd>
+                        <span>+</span>
+                        <kbd className="px-2 py-1 bg-slate-100 rounded text-xs font-mono">Enter</kbd>
+                        <span className="ml-1">to generate</span>
+                      </div>
+                    </div>
                   </div>
                 </div>
               </DialogContent>
             </Dialog>
             
-            <Button variant="link" className="text-slate-500 font-bold text-lg hover:text-primary transition-colors">
-              See Examples
-            </Button>
+            <ExamplesModal onTryGenerator={() => setShowGenerator(true)}>
+              <Button variant="link" className="text-slate-500 font-bold text-lg hover:text-primary transition-colors">
+                See Examples
+              </Button>
+            </ExamplesModal>
           </div>
 
           {/* Features Grid */}

@@ -38,12 +38,15 @@ import {
   Search,
   Filter
 } from 'lucide-react';
-import { ProposalInputSchema, type ProposalInput } from '../types';import { usePresence } from '../hooks/use-presence';
+import { ProposalInputSchema, type ProposalInput } from '../types';
+import { usePresence } from '../hooks/use-presence';
 import { PROPOSAL_TEMPLATES } from '../templates';
 import { ProposalService } from '../services/proposal-service';
 import { useProposalStore } from '../store/proposal-store';
 import { AnalyticsDashboard } from './analytics-dashboard';
 import { HistorySkeleton } from './history-skeleton';
+import { WelcomeScreen } from './welcome-screen';
+import { SmartFormWizard } from './smart-form-wizard';
 import { Button } from '@/shared/components/ui/button';
 import { Input } from '@/shared/components/ui/input';
 import { Label } from '@/shared/components/ui/label';
@@ -90,6 +93,9 @@ export function ProposalGenerator() {
     setGenerating, 
     history 
   } = useProposalStore();
+  
+  // UI State Management
+  const [mode, setMode] = useState<'welcome' | 'wizard' | 'generator'>('welcome');
   const [activeTab, setActiveTab] = useState('generator');
   const [isExporting, setIsExporting] = useState(false);
   const [isSending, setIsSending] = useState(false);
@@ -367,6 +373,64 @@ export function ProposalGenerator() {
 
   return (
     <div className="w-full h-full flex flex-col space-y-8 animate-in fade-in duration-500">
+      {/* Welcome Screen */}
+      {mode === 'welcome' && (
+        <WelcomeScreen
+          onGetStarted={() => setMode('wizard')}
+          onSkip={() => setMode('generator')}
+        />
+      )}
+
+      {/* Smart Form Wizard */}
+      {mode === 'wizard' && (
+        <SmartFormWizard
+          onComplete={(data) => {
+            // Pre-fill the form with wizard data
+            setValue('clientName', data.clientName);
+            setValue('projectTitle', data.projectTitle);
+            setValue('budgetRange', data.budgetRange);
+            setValue('timeline', data.timeline);
+            setValue('requirements', data.requirements);
+            setMode('generator');
+          }}
+          onBack={() => setMode('welcome')}
+        />
+      )}
+
+      {/* Main Generator Interface */}
+      {mode === 'generator' && (
+        <>
+          {/* Enhanced Header */}
+          <div className="flex items-center justify-between mb-6">
+            <div className="flex items-center gap-4">
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => setMode('welcome')}
+                className="text-slate-500 hover:text-slate-700"
+              >
+                ← Back to Welcome
+              </Button>
+              <div className="w-px h-6 bg-slate-200" />
+              <div>
+                <h2 className="text-2xl font-bold text-slate-900">Proposal Generator</h2>
+                <p className="text-slate-600">Create professional proposals with AI assistance</p>
+              </div>
+            </div>
+            
+            {/* Quick Actions */}
+            <div className="flex items-center gap-2">
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => setMode('wizard')}
+                className="hidden sm:flex"
+              >
+                <Wand2 className="w-4 h-4 mr-2" />
+                Use Wizard
+              </Button>
+            </div>
+          </div>
       <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full flex-1 flex flex-col">
         <div className="px-1 mb-8">
           <TabsList className="w-full max-w-lg h-12 p-1 bg-slate-100/80 rounded-2xl border border-slate-200/50 backdrop-blur-sm">
@@ -462,7 +526,7 @@ export function ProposalGenerator() {
                     <div className="space-y-6">
                       <div className="flex items-center justify-between">
                         <Label className="text-lg font-black text-slate-900">Select Proposal Template</Label>
-                        <Badge variant="outline" className="text-[10px] font-bold uppercase tracking-wider text-slate-400 border-slate-200">
+                        <Badge variant="outline" className="text-[10px] font-bold uppercase tracking-wider text-slate-500 border-slate-200">
                           {PROPOSAL_TEMPLATES.length} Designs Available
                         </Badge>
                       </div>
@@ -501,7 +565,7 @@ export function ProposalGenerator() {
                                    <Wand2 className="w-6 h-6" />}
                                 </div>
                                 <div>
-                                  <h4 className="font-black text-slate-900">{template.name}</h4>
+                                  <h3 className="font-black text-slate-900">{template.name}</h3>
                                   <Badge variant="secondary" className="text-[9px] font-bold uppercase tracking-widest px-1.5 py-0">
                                     {template.style}
                                   </Badge>
@@ -513,7 +577,7 @@ export function ProposalGenerator() {
                               </p>
 
                               <div className="space-y-3 pt-2">
-                                <div className="flex items-center gap-2 text-[10px] font-bold text-slate-400 uppercase tracking-widest">
+                                <div className="flex items-center gap-2 text-[10px] font-bold text-slate-500 uppercase tracking-widest">
                                   <Sparkles className="w-3 h-3" /> Included Sections
                                 </div>
                                 <div className="flex flex-wrap gap-1.5">
@@ -633,7 +697,7 @@ export function ProposalGenerator() {
                             )}
                           >
                             <p className="font-black text-sm text-slate-900">{t.label}</p>
-                            <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mt-0.5">{t.desc}</p>
+                            <p className="text-[10px] font-bold text-slate-500 uppercase tracking-widest mt-0.5">{t.desc}</p>
                           </button>
                         ))}
                       </div>
@@ -1120,6 +1184,7 @@ export function ProposalGenerator() {
                                     onClick={() => handleStartEdit(section.id, section.content)}
                                     className="h-8 w-8 rounded-full"
                                     title="Edit section"
+                                    aria-label={`Edit ${section.title} section`}
                                   >
                                     <Edit3 className="w-3.5 h-3.5" />
                                   </Button>
@@ -1130,6 +1195,7 @@ export function ProposalGenerator() {
                                     disabled={regeneratingSectionId === section.id}
                                     className="h-8 w-8 rounded-full"
                                     title="Regenerate with AI"
+                                    aria-label={`Regenerate ${section.title} section with AI`}
                                   >
                                     {regeneratingSectionId === section.id
                                       ? <Loader2 className="w-3.5 h-3.5 animate-spin" />
@@ -1428,6 +1494,8 @@ export function ProposalGenerator() {
           <AnalyticsDashboard />
         </TabsContent>
       </Tabs>
+        </>
+      )}
     </div>
   );
 }
