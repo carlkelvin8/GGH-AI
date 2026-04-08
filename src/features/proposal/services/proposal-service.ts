@@ -3,10 +3,15 @@ import {
   type ProposalInput, 
   ProposalSchema 
 } from '../types';
+import { 
+  createUserFriendlyError, 
+  retryWithBackoff, 
+  withTimeout 
+} from '@/shared/lib/error-handler';
 
 /**
  * Service Layer for Proposal Generation logic.
- * Follows the GGH Repository and Service patterns.
+ * Enhanced with better error handling and user feedback.
  */
 export class ProposalService {
   /**
@@ -15,17 +20,23 @@ export class ProposalService {
    */
   static async generate(input: ProposalInput): Promise<Proposal> {
     try {
-      // Simulate API call to AI service
-      const response = await fetch('/api/v1/proposals/generate', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify(input),
-      });
+      // Add timeout and retry logic
+      const response = await retryWithBackoff(async () => {
+        return withTimeout(
+          fetch('/api/v1/proposals/generate', {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+            },
+            body: JSON.stringify(input),
+          }),
+          30000 // 30 second timeout
+        );
+      }, 2); // Retry up to 2 times
 
       if (!response.ok) {
-        throw new Error(`Failed to generate proposal: ${response.statusText}`);
+        const errorData = await response.json().catch(() => ({}));
+        throw new Error(errorData.error || `HTTP ${response.status}: ${response.statusText}`);
       }
 
       const data = await response.json();
@@ -40,7 +51,10 @@ export class ProposalService {
         input,
         timestamp: new Date().toISOString(),
       });
-      throw error;
+      
+      // Convert to user-friendly error
+      const userError = createUserFriendlyError(error);
+      throw new Error(userError.message);
     }
   }
 
@@ -149,14 +163,14 @@ export class ProposalService {
    * Generates a unique share link for a proposal.
    * Persists the shareId to the database so the link works for any recipient.
    */
-  static async generateShareLink(proposalId: string): Promise<string> {
+  static async generateShareLink(proposalId: string, isPublic: boolean = true): Promise<string> {
     const shareId = Math.random().toString(36).substring(2, 15);
 
     // Persist shareId + isPublic to DB
     await fetch(`/api/v1/proposals/${proposalId}`, {
       method: 'PUT',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ shareId, isPublic: true }),
+      body: JSON.stringify({ shareId, isPublic }),
     }).catch(() => {}); // best-effort; Zustand store is source of truth locally
 
     return `${window.location.origin}/proposals/share/${shareId}`;

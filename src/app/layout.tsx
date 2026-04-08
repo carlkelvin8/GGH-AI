@@ -4,6 +4,7 @@ import './globals.css';
 import QueryProvider from '@/shared/lib/query-provider';
 import { AuthHeader } from '@/shared/components/auth-header';
 import { ThemeToggle } from '@/shared/components/theme-toggle';
+import { NetworkStatus } from '@/shared/components/error-display';
 import { Toaster } from 'sonner';
 
 const geistSans = Geist({
@@ -43,6 +44,7 @@ export default function RootLayout({
           </div>
         </header>
         <QueryProvider>{children}</QueryProvider>
+        <NetworkStatus />
         <Toaster richColors position="bottom-right" />
       </body>
     </html>

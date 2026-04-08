@@ -98,6 +98,7 @@ export function ProposalGenerator() {
   const [currentStep, setCurrentStep] = useState<string | null>(null);
   const [isSharing, setIsSharing] = useState(false);
   const [shareLink, setShareLink] = useState<string | null>(null);
+  const [isPublicShare, setIsPublicShare] = useState(true);
   const [collaboratorEmail, setCollaboratorEmail] = useState('');
   const [isInviting, setIsInviting] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
@@ -321,7 +322,7 @@ export function ProposalGenerator() {
     setIsSharing(true);
     const toastId = toast.loading('Generating share link…');
     try {
-      const link = await ProposalService.generateShareLink(currentProposal.id);
+      const link = await ProposalService.generateShareLink(currentProposal.id, isPublicShare);
       const shareId = link.split('/').pop() || '';
       setShareId(currentProposal.id, shareId);
       setShareLink(link);
@@ -929,14 +930,45 @@ export function ProposalGenerator() {
                         </DialogHeader>
                         <div className="space-y-6 py-4">
                           {!shareLink ? (
-                            <Button 
-                              onClick={handleShareProposal} 
-                              disabled={isSharing}
-                              className="w-full h-12 rounded-xl bg-primary font-bold shadow-lg"
-                            >
-                              {isSharing ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : <Share2 className="w-4 h-4 mr-2" />}
-                              Generate Share Link
-                            </Button>
+                            <div className="space-y-4">
+                              <div className="space-y-3">
+                                <Label className="text-sm font-bold text-slate-700">Sharing Options</Label>
+                                <div className="flex items-center space-x-3">
+                                  <input
+                                    type="radio"
+                                    id="public-share"
+                                    name="share-type"
+                                    checked={isPublicShare}
+                                    onChange={() => setIsPublicShare(true)}
+                                    className="w-4 h-4 text-primary border-slate-300 focus:ring-primary"
+                                  />
+                                  <Label htmlFor="public-share" className="text-sm text-slate-600 cursor-pointer">
+                                    <span className="font-semibold">Public</span> - Anyone with the link can view
+                                  </Label>
+                                </div>
+                                <div className="flex items-center space-x-3">
+                                  <input
+                                    type="radio"
+                                    id="private-share"
+                                    name="share-type"
+                                    checked={!isPublicShare}
+                                    onChange={() => setIsPublicShare(false)}
+                                    className="w-4 h-4 text-primary border-slate-300 focus:ring-primary"
+                                  />
+                                  <Label htmlFor="private-share" className="text-sm text-slate-600 cursor-pointer">
+                                    <span className="font-semibold">Private</span> - Only you can access (requires login)
+                                  </Label>
+                                </div>
+                              </div>
+                              <Button 
+                                onClick={handleShareProposal} 
+                                disabled={isSharing}
+                                className="w-full h-12 rounded-xl bg-primary font-bold shadow-lg"
+                              >
+                                {isSharing ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : <Share2 className="w-4 h-4 mr-2" />}
+                                Generate Share Link
+                              </Button>
+                            </div>
                           ) : (
                             <div className="space-y-4">
                               <div className="p-4 bg-slate-50 rounded-2xl border border-slate-100 flex items-center justify-between gap-4">
@@ -945,7 +977,11 @@ export function ProposalGenerator() {
                                   <Copy className="w-4 h-4" />
                                 </Button>
                               </div>
-                              <p className="text-[10px] text-slate-400 text-center">Anyone with this link can view the proposal.</p>
+                              <p className="text-[10px] text-slate-400 text-center">
+                                {isPublicShare 
+                                  ? "Anyone with this link can view the proposal." 
+                                  : "Only you can access this proposal (requires login)."}
+                              </p>
                             </div>
                           )}
                         </div>

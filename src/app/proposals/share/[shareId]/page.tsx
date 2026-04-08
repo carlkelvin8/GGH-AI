@@ -2,14 +2,15 @@ import { prisma } from '@/shared/lib/prisma';
 import { ProposalSchema } from '@/features/proposal/types';
 import { Badge } from '@/shared/components/ui/badge';
 import { Button } from '@/shared/components/ui/button';
-import { FileText, Ghost } from 'lucide-react';
+import { FileText, Ghost, Lock } from 'lucide-react';
 import Link from 'next/link';
 import { cn } from '@/shared/lib/utils';
+import { auth } from '../../../../../auth';
 
 /**
  * Public Share Page — Server Component.
  * Fetches the proposal from the database by shareId.
- * Works for any recipient, not just the original author.
+ * Works for public proposals or private proposals for authenticated owners.
  */
 export default async function SharePage({
   params,
@@ -19,7 +20,7 @@ export default async function SharePage({
   const { shareId } = await params;
 
   const row = await prisma.proposal.findFirst({
-    where: { shareId, isPublic: true },
+    where: { shareId },
   });
 
   if (!row) {
@@ -31,7 +32,7 @@ export default async function SharePage({
           </div>
           <h2 className="text-2xl font-black text-slate-900">Proposal Not Found</h2>
           <p className="text-slate-500 font-medium">
-            The link might be expired or the proposal is no longer public.
+            The link might be expired or the proposal no longer exists.
           </p>
           <Button asChild variant="outline" className="rounded-xl">
             <Link href="/">Back to GGH AI</Link>
@@ -39,6 +40,34 @@ export default async function SharePage({
         </div>
       </div>
     );
+  }
+
+  // Check if proposal is private and user has access
+  if (!row.isPublic) {
+    const session = await auth();
+    if (!session?.user?.id || session.user.id !== row.userId) {
+      return (
+        <div className="min-h-screen flex items-center justify-center p-8 bg-slate-50">
+          <div className="max-w-md w-full text-center space-y-6">
+            <div className="p-6 bg-white rounded-3xl border border-slate-100 shadow-xl inline-block">
+              <Lock className="w-12 h-12 text-slate-300" />
+            </div>
+            <h2 className="text-2xl font-black text-slate-900">Private Proposal</h2>
+            <p className="text-slate-500 font-medium">
+              This proposal is private and requires authentication to view.
+            </p>
+            <div className="space-y-3">
+              <Button asChild className="w-full rounded-xl">
+                <Link href="/auth/signin">Sign In to View</Link>
+              </Button>
+              <Button asChild variant="outline" className="w-full rounded-xl">
+                <Link href="/">Back to GGH AI</Link>
+              </Button>
+            </div>
+          </div>
+        </div>
+      );
+    }
   }
 
   // Increment view count server-side (fire and forget)
@@ -79,9 +108,17 @@ export default async function SharePage({
               GGH <span className="text-primary">Proposal AI</span>
             </span>
           </div>
-          <Badge className="bg-emerald-50 text-emerald-600 border-emerald-100 font-bold uppercase tracking-widest text-[10px]">
-            Official Proposal
-          </Badge>
+          <div className="flex items-center gap-3">
+            <Badge className="bg-emerald-50 text-emerald-600 border-emerald-100 font-bold uppercase tracking-widest text-[10px]">
+              Official Proposal
+            </Badge>
+            {!proposal.isPublic && (
+              <Badge className="bg-amber-50 text-amber-600 border-amber-100 font-bold uppercase tracking-widest text-[10px] flex items-center gap-1">
+                <Lock className="w-3 h-3" />
+                Private
+              </Badge>
+            )}
+          </div>
         </div>
 
         <div className="bg-white rounded-[2.5rem] shadow-2xl shadow-slate-200/60 overflow-hidden border border-slate-100">

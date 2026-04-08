@@ -42,6 +42,8 @@ model User {
   emailVerified DateTime?
   image         String?
   password      String?    // hashed — null for OAuth-only users
+  resetToken    String?    // password reset token
+  resetTokenExpiry DateTime? // reset token expiration
   accounts      Account[]
   sessions      Session[]
   proposals     Proposal[]

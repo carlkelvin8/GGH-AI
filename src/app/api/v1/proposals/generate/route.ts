@@ -47,16 +47,34 @@ export async function POST(request: Request) {
   try {
     body = await request.json();
   } catch (error) {
-    return Response.json({ error: 'Invalid JSON in request body' }, { status: 400 });
+    return Response.json({ 
+      error: 'Invalid request format. Please check your input and try again.' 
+    }, { status: 400 });
   }
   
   const parsed = ProposalInputSchema.safeParse(body);
 
   if (!parsed.success) {
-    return Response.json({ error: 'Invalid input', details: parsed.error.flatten() }, { status: 400 });
+    const fieldErrors = parsed.error.flatten().fieldErrors;
+    const errorMessages = Object.entries(fieldErrors)
+      .map(([field, errors]) => `${field}: ${errors?.join(', ')}`)
+      .join('; ');
+    
+    return Response.json({ 
+      error: 'Please check your form inputs',
+      details: errorMessages || 'Invalid input format'
+    }, { status: 400 });
   }
 
   const input = parsed.data;
+  
+  // Check if OpenAI API key is configured
+  if (!process.env.OPENAI_API_KEY) {
+    return Response.json({ 
+      error: 'AI service is temporarily unavailable. Please try again later or contact support.' 
+    }, { status: 503 });
+  }
+
   const template = PROPOSAL_TEMPLATES.find((t) => t.id === input.templateId) ?? PROPOSAL_TEMPLATES[0];
   // Use custom sections if provided, otherwise fall back to template defaults
   const sections = (input.customSections && input.customSections.length > 0)
@@ -74,14 +92,14 @@ export async function POST(request: Request) {
       try {
         // Emit progress steps while the LLM is thinking
         const steps = [
-          'Initializing OpenClaw Agent...',
-          'Analyzing client profile and project title...',
+          'Initializing AI proposal generator...',
+          'Analyzing your project requirements...',
           `Applying '${template.name}' template structure...`,
           'Breaking down requirements into strategic objectives...',
-          'Generating section content with OpenClaw-v4...',
-          'Synthesizing Scope of Work using project-specific context...',
-          'Calculating Timeline & Budget estimates...',
-          'Finalizing proposal structure and GGH standards check...',
+          'Generating professional content with AI...',
+          'Creating scope of work section...',
+          'Calculating timeline and budget estimates...',
+          'Finalizing proposal structure and quality check...',
         ];
 
         // Start the OpenAI call immediately; emit steps while we wait
@@ -103,7 +121,13 @@ export async function POST(request: Request) {
 
         const completion = await completionPromise;
         const raw = completion.choices[0]?.message?.content ?? '{}';
-        const parsed = JSON.parse(raw) as { sections: { title: string; content: string }[] };
+        
+        let parsed;
+        try {
+          parsed = JSON.parse(raw) as { sections: { title: string; content: string }[] };
+        } catch (parseError) {
+          throw new Error('AI generated invalid response format. Please try again.');
+        }
 
         // Map LLM sections to our schema, filling gaps if the model missed any
         const sectionResults = sections.map((title) => {
@@ -113,7 +137,7 @@ export async function POST(request: Request) {
           return {
             id: crypto.randomUUID(),
             title,
-            content: match?.content ?? `Content for ${title} could not be generated. Please edit this section.`,
+            content: match?.content ?? `Content for ${title} could not be generated. Please try regenerating this section.`,
           };
         });
 
@@ -130,8 +154,23 @@ export async function POST(request: Request) {
 
         send({ type: 'done', data: proposal });
       } catch (err) {
-        const message = err instanceof Error ? err.message : 'Unknown error';
-        send({ type: 'error', data: message });
+        console.error('Proposal generation error:', err);
+        
+        let userMessage = 'Failed to generate proposal. Please try again.';
+        
+        if (err instanceof Error) {
+          if (err.message.includes('rate_limit')) {
+            userMessage = 'Too many requests. Please wait a moment and try again.';
+          } else if (err.message.includes('insufficient_quota')) {
+            userMessage = 'AI service quota exceeded. Please contact support.';
+          } else if (err.message.includes('timeout')) {
+            userMessage = 'Request timed out. Please try with shorter requirements.';
+          } else if (err.message.includes('invalid_api_key')) {
+            userMessage = 'AI service configuration error. Please contact support.';
+          }
+        }
+        
+        send({ type: 'error', data: userMessage });
       } finally {
         controller.close();
       }

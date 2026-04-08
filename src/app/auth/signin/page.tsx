@@ -2,6 +2,7 @@
 
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
+import Link from 'next/link';
 import { FileText, Loader2, Eye, EyeOff } from 'lucide-react';
 import { Button } from '@/shared/components/ui/button';
 import { Input } from '@/shared/components/ui/input';
@@ -170,6 +171,14 @@ export default function SignInPage() {
                 <Button type="submit" disabled={loading} className="w-full h-11 rounded-xl font-bold">
                   {loading ? <Loader2 className="w-4 h-4 animate-spin" /> : 'Sign In'}
                 </Button>
+                <div className="text-center">
+                  <Link 
+                    href="/auth/forgot-password" 
+                    className="text-sm text-primary hover:underline"
+                  >
+                    Forgot your password?
+                  </Link>
+                </div>
               </form>
             ) : (
               <form onSubmit={handleSignUp} className="space-y-4">
