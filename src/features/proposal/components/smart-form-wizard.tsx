@@ -91,12 +91,29 @@ export function SmartFormWizard({ onComplete, onBack }: SmartFormWizardProps) {
   // Validate current step
   const isStepValid = () => {
     const step = steps[currentStep];
-    return step.fields.every(field => {
-      if (field === 'requirements') {
-        return formData.requirements.some(req => req.title.trim() && req.description.trim());
-      }
-      return formData[field as keyof typeof formData]?.toString().trim();
-    });
+    
+    if (currentStep === 0) {
+      // Step 1: Only require clientName and projectTitle
+      const valid = formData.clientName.trim() && formData.projectTitle.trim();
+      console.log('Step 0 validation:', { clientName: formData.clientName, projectTitle: formData.projectTitle, valid });
+      return valid;
+    }
+    
+    if (currentStep === 1) {
+      // Step 2: Only require budgetRange and timeline (industry and projectType are optional)
+      const valid = formData.budgetRange.trim() && formData.timeline.trim();
+      console.log('Step 1 validation:', { budgetRange: formData.budgetRange, timeline: formData.timeline, valid });
+      return valid;
+    }
+    
+    if (currentStep === 2) {
+      // Step 3: Require at least one complete requirement
+      const valid = formData.requirements.some(req => req.title.trim() && req.description.trim());
+      console.log('Step 2 validation:', { requirements: formData.requirements, valid });
+      return valid;
+    }
+    
+    return false;
   };
 
   // Update completed steps
@@ -416,24 +433,84 @@ export function SmartFormWizard({ onComplete, onBack }: SmartFormWizardProps) {
                 }
               </p>
               <div className="space-y-2">
-                {currentStepData.fields.map((field) => {
-                  const isFieldValid = field === 'requirements' 
-                    ? formData.requirements.some(req => req.title.trim() && req.description.trim())
-                    : formData[field as keyof typeof formData]?.toString().trim();
-                  
-                  return (
-                    <div key={field} className="flex items-center gap-2">
-                      {isFieldValid ? (
+                {/* Step 1: Client Info */}
+                {currentStep === 0 && (
+                  <>
+                    <div className="flex items-center gap-2">
+                      {formData.clientName.trim() ? (
                         <CheckCircle2 className="w-4 h-4 text-emerald-500" />
                       ) : (
                         <div className="w-4 h-4 border-2 border-slate-300 rounded-full" />
                       )}
-                      <span className="text-sm text-slate-600 capitalize">
-                        {field.replace(/([A-Z])/g, ' $1').trim()}
-                      </span>
+                      <span className="text-sm text-slate-600">Client Name</span>
+                      <span className="text-xs text-red-500">*</span>
                     </div>
-                  );
-                })}
+                    <div className="flex items-center gap-2">
+                      {formData.projectTitle.trim() ? (
+                        <CheckCircle2 className="w-4 h-4 text-emerald-500" />
+                      ) : (
+                        <div className="w-4 h-4 border-2 border-slate-300 rounded-full" />
+                      )}
+                      <span className="text-sm text-slate-600">Project Title</span>
+                      <span className="text-xs text-red-500">*</span>
+                    </div>
+                  </>
+                )}
+                
+                {/* Step 2: Project Scope */}
+                {currentStep === 1 && (
+                  <>
+                    <div className="flex items-center gap-2">
+                      {formData.budgetRange.trim() ? (
+                        <CheckCircle2 className="w-4 h-4 text-emerald-500" />
+                      ) : (
+                        <div className="w-4 h-4 border-2 border-slate-300 rounded-full" />
+                      )}
+                      <span className="text-sm text-slate-600">Budget Range</span>
+                      <span className="text-xs text-red-500">*</span>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      {formData.timeline.trim() ? (
+                        <CheckCircle2 className="w-4 h-4 text-emerald-500" />
+                      ) : (
+                        <div className="w-4 h-4 border-2 border-slate-300 rounded-full" />
+                      )}
+                      <span className="text-sm text-slate-600">Timeline</span>
+                      <span className="text-xs text-red-500">*</span>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      {formData.industry.trim() ? (
+                        <CheckCircle2 className="w-4 h-4 text-emerald-500" />
+                      ) : (
+                        <div className="w-4 h-4 border-2 border-slate-200 rounded-full" />
+                      )}
+                      <span className="text-sm text-slate-500">Industry</span>
+                      <span className="text-xs text-slate-400">(optional)</span>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      {formData.projectType.trim() ? (
+                        <CheckCircle2 className="w-4 h-4 text-emerald-500" />
+                      ) : (
+                        <div className="w-4 h-4 border-2 border-slate-200 rounded-full" />
+                      )}
+                      <span className="text-sm text-slate-500">Project Type</span>
+                      <span className="text-xs text-slate-400">(optional)</span>
+                    </div>
+                  </>
+                )}
+                
+                {/* Step 3: Requirements */}
+                {currentStep === 2 && (
+                  <div className="flex items-center gap-2">
+                    {formData.requirements.some(req => req.title.trim() && req.description.trim()) ? (
+                      <CheckCircle2 className="w-4 h-4 text-emerald-500" />
+                    ) : (
+                      <div className="w-4 h-4 border-2 border-slate-300 rounded-full" />
+                    )}
+                    <span className="text-sm text-slate-600">At least one complete requirement</span>
+                    <span className="text-xs text-red-500">*</span>
+                  </div>
+                )}
               </div>
             </CardContent>
           </Card>
@@ -455,10 +532,19 @@ export function SmartFormWizard({ onComplete, onBack }: SmartFormWizardProps) {
           <span className="text-sm text-slate-500">
             {completedSteps.size} of {steps.length} steps completed
           </span>
+          {/* Debug info */}
+          <span className="text-xs text-slate-400">
+            Step {currentStep + 1} valid: {isStepValid() ? '✅' : '❌'}
+          </span>
+        </div>
           <Button
             onClick={handleNext}
             disabled={!isStepValid()}
-            className="flex items-center gap-2"
+            className={`flex items-center gap-2 ${
+              !isStepValid() 
+                ? 'opacity-50 cursor-not-allowed' 
+                : 'hover:scale-105 transition-transform'
+            }`}
           >
             {currentStep === steps.length - 1 ? (
               <>
