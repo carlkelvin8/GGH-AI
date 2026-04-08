@@ -1,7 +1,8 @@
 import { prisma } from '@/shared/lib/prisma';
 import { ProposalSchema } from '@/features/proposal/types';
+import { auth } from '../../../../../../../auth';
 
-/** GET /api/v1/proposals/share/[shareId] — public, no auth */
+/** GET /api/v1/proposals/share/[shareId] — public for public proposals, auth required for private */
 export async function GET(
   _req: Request,
   { params }: { params: Promise<{ shareId: string }> }
@@ -9,10 +10,18 @@ export async function GET(
   const { shareId } = await params;
 
   const row = await prisma.proposal.findFirst({
-    where: { shareId, isPublic: true },
+    where: { shareId },
   });
 
   if (!row) return Response.json({ error: 'Not found' }, { status: 404 });
+
+  // If proposal is private, require authentication and ownership
+  if (!row.isPublic) {
+    const session = await auth();
+    if (!session?.user?.id || session.user.id !== row.userId) {
+      return Response.json({ error: 'Unauthorized - Private proposal' }, { status: 401 });
+    }
+  }
 
   // Increment view count
   await prisma.proposal.update({
