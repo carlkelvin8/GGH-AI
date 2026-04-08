@@ -40,6 +40,8 @@ export const ProposalInputSchema = z.object({
   timeline: z.string().optional(),
   requirements: z.array(ProposalRequirementSchema).min(1),
   templateId: z.string(),
+  tone: z.enum(['formal', 'casual', 'technical']).default('formal'),
+  customSections: z.array(z.string()).optional(),
 });
 
 /**

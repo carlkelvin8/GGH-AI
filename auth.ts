@@ -4,7 +4,6 @@ import Google from 'next-auth/providers/google';
 import Credentials from 'next-auth/providers/credentials';
 import { PrismaAdapter } from '@auth/prisma-adapter';
 import { prisma } from '@/shared/lib/prisma';
-import bcrypt from 'bcryptjs';
 
 class InvalidCredentialsError extends CredentialsSignin {
   code = 'invalid_credentials';
@@ -12,7 +11,7 @@ class InvalidCredentialsError extends CredentialsSignin {
 
 export const { handlers, auth, signIn, signOut } = NextAuth({
   adapter: PrismaAdapter(prisma),
-  session: { strategy: 'jwt' }, // required for Credentials provider
+  session: { strategy: 'jwt' },
   providers: [
     GitHub,
     Google,
@@ -29,6 +28,8 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
         const user = await prisma.user.findUnique({ where: { email } });
         if (!user?.password) throw new InvalidCredentialsError();
 
+        // Lazy-import bcryptjs so it only loads in Node.js context
+        const bcrypt = await import('bcryptjs');
         const valid = await bcrypt.compare(password, user.password);
         if (!valid) throw new InvalidCredentialsError();
 

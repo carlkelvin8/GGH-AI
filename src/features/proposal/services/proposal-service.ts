@@ -197,8 +197,23 @@ export class ProposalService {
   }
 
   /**
-   * Adds a collaborator to a proposal.
+   * Regenerates a single section using AI without touching the rest of the proposal.
    */
+  static async regenerateSection(
+    sectionTitle: string,
+    input: ProposalInput,
+    tone: 'formal' | 'casual' | 'technical' = 'formal'
+  ): Promise<string> {
+    const res = await fetch('/api/v1/proposals/regenerate-section', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ sectionTitle, input, tone }),
+    });
+    if (!res.ok) throw new Error('Regeneration failed');
+    const data = await res.json() as { content?: string; error?: string };
+    if (data.error) throw new Error(data.error);
+    return data.content ?? '';
+  }
   static async addCollaborator(proposalId: string, email: string): Promise<void> {
     await new Promise((resolve) => setTimeout(resolve, 800));
     // In a real app, this would trigger an invitation email and update the database

@@ -29,7 +29,12 @@ export async function PUT(
   const existing = await prisma.proposal.findFirst({ where: { id, userId: session.user.id } });
   if (!existing) return Response.json({ error: 'Not found' }, { status: 404 });
 
-  const body = await request.json() as Record<string, unknown>;
+  let body;
+  try {
+    body = await request.json() as Record<string, unknown>;
+  } catch (error) {
+    return Response.json({ error: 'Invalid JSON in request body' }, { status: 400 });
+  }
 
   // Accept either a full Proposal or a partial patch object
   const fullParsed = ProposalSchema.safeParse(body);

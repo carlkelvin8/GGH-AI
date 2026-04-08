@@ -3,6 +3,7 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { useForm, useFieldArray } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
+import { toast } from 'sonner';
 import { 
   Plus, 
   Trash2, 
@@ -37,12 +38,12 @@ import {
   Search,
   Filter
 } from 'lucide-react';
-import { ProposalInputSchema, type ProposalInput, type ProposalTemplate } from '../types';
-import { usePresence } from '../hooks/use-presence';
+import { ProposalInputSchema, type ProposalInput } from '../types';import { usePresence } from '../hooks/use-presence';
 import { PROPOSAL_TEMPLATES } from '../templates';
 import { ProposalService } from '../services/proposal-service';
 import { useProposalStore } from '../store/proposal-store';
 import { AnalyticsDashboard } from './analytics-dashboard';
+import { HistorySkeleton } from './history-skeleton';
 import { Button } from '@/shared/components/ui/button';
 import { Input } from '@/shared/components/ui/input';
 import { Label } from '@/shared/components/ui/label';
@@ -57,8 +58,7 @@ import {
   DialogTrigger, 
   DialogHeader, 
   DialogTitle, 
-  DialogDescription,
-  DialogFooter
+  DialogDescription
 } from '@/shared/components/ui/dialog';
 import { 
   DropdownMenu, 
@@ -93,7 +93,6 @@ export function ProposalGenerator() {
   const [activeTab, setActiveTab] = useState('generator');
   const [isExporting, setIsExporting] = useState(false);
   const [isSending, setIsSending] = useState(false);
-  const [sendSuccess, setSendSuccess] = useState(false);
   const [editingSectionId, setEditingSectionId] = useState<string | null>(null);
   const [editContent, setEditContent] = useState('');
   const [currentStep, setCurrentStep] = useState<string | null>(null);
@@ -101,13 +100,23 @@ export function ProposalGenerator() {
   const [shareLink, setShareLink] = useState<string | null>(null);
   const [collaboratorEmail, setCollaboratorEmail] = useState('');
   const [isInviting, setIsInviting] = useState(false);
-  const [inviteSuccess, setInviteSuccess] = useState(false);
-  const [copySuccess, setCopySuccess] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
   const [statusFilter, setStatusFilter] = useState<'all' | 'draft' | 'finalized' | 'expired'>('all');
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [isDirty, setIsDirty] = useState(false);
+  const [historyLoading, setHistoryLoading] = useState(true);
+  const [tone, setTone] = useState<'formal' | 'casual' | 'technical'>('formal');
+  const [customSections, setCustomSections] = useState<string[]>([]);
+  const [newSectionName, setNewSectionName] = useState('');
+  const [regeneratingSectionId, setRegeneratingSectionId] = useState<string | null>(null);
   const autoSaveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const DRAFT_KEY = 'ggh-proposal-draft';
+
+  // Simulate loading for history tab on mount
+  useEffect(() => {
+    const timer = setTimeout(() => setHistoryLoading(false), 800);
+    return () => clearTimeout(timer);
+  }, []);
 
   // Keyboard shortcuts: Cmd/Ctrl+S to save, Esc to cancel
   useEffect(() => {
@@ -139,12 +148,31 @@ export function ProposalGenerator() {
     formState: { errors },
     reset: resetForm,
   } = useForm<ProposalInput>({
-    resolver: zodResolver(ProposalInputSchema),
-    defaultValues: {
-      requirements: [{ id: crypto.randomUUID(), title: '', description: '', priority: 'medium' }],
-      templateId: 'modern',
-    },
+    resolver: zodResolver(ProposalInputSchema) as never,
+    defaultValues: (() => {
+      if (typeof window !== 'undefined') {
+        try {
+          const saved = localStorage.getItem(DRAFT_KEY);
+          if (saved) return JSON.parse(saved) as ProposalInput;
+        } catch { /* ignore */ }
+      }
+      return {
+        requirements: [{ id: crypto.randomUUID(), title: '', description: '', priority: 'medium' as const }],
+        templateId: 'modern',
+        tone: 'formal' as const,
+      };
+    })(),
   });
+
+  const formValues = watch();
+
+  // Persist form draft to localStorage on every change
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      try { localStorage.setItem(DRAFT_KEY, JSON.stringify(formValues)); } catch { /* ignore */ }
+    }, 500);
+    return () => clearTimeout(timer);
+  }, [formValues]);
 
   const selectedTemplateId = watch('templateId');
 
@@ -154,26 +182,29 @@ export function ProposalGenerator() {
   });
 
   const onSubmit = async (data: ProposalInput) => {
-    // Basic requirement check
     const hasValidRequirements = data.requirements.some(r => r.title.trim() && r.description.trim());
     if (!hasValidRequirements) {
-      alert("Please provide at least one complete requirement with a title and description.");
+      toast.error('Add at least one complete requirement with a title and description.');
       return;
     }
 
     setGenerating(true);
     setCurrentStep('Initializing OpenClaw Agent...');
     try {
-      const proposal = await ProposalService.openClawGenerate(data, (step) => {
+      const payload = { ...data, tone, customSections: customSections.length > 0 ? customSections : undefined };
+      const proposal = await ProposalService.openClawGenerate(payload, (step) => {
         setCurrentStep(step);
       });
       setProposal(proposal);
       addToHistory(proposal);
-      // Persist to DB (best-effort — Zustand localStorage is the fallback)
       ProposalService.saveToDb(proposal).catch(() => {});
+      // Clear draft after successful generation
+      try { localStorage.removeItem(DRAFT_KEY); } catch { /* ignore */ }
       setActiveTab('preview');
+      toast.success('Proposal generated successfully.');
     } catch (error) {
-      console.error('Generation failed:', error);
+      const msg = error instanceof Error ? error.message : 'Generation failed.';
+      toast.error(msg);
     } finally {
       setGenerating(false);
       setCurrentStep(null);
@@ -183,12 +214,14 @@ export function ProposalGenerator() {
   const handleExportPDF = async () => {
     if (!currentProposal) return;
     setIsExporting(true);
+    const toastId = toast.loading('Exporting PDF…');
     try {
       const filename = `${currentProposal.input.clientName.replace(/\s+/g, '_')}_Proposal`;
       await ProposalService.exportToProfessionalPDF('proposal-preview-content', filename);
       trackExport(currentProposal.id);
+      toast.success('PDF exported.', { id: toastId });
     } catch (error) {
-      console.error('PDF Export failed:', error);
+      toast.error('PDF export failed.', { id: toastId });
     } finally {
       setIsExporting(false);
     }
@@ -197,12 +230,12 @@ export function ProposalGenerator() {
   const handleSendToClient = async () => {
     if (!currentProposal) return;
     setIsSending(true);
+    const toastId = toast.loading('Sending to client…');
     try {
       await ProposalService.sendToClient(currentProposal.id);
-      setSendSuccess(true);
-      setTimeout(() => setSendSuccess(false), 3000);
-    } catch (error) {
-      console.error('Send failed:', error);
+      toast.success('Sent to client.', { id: toastId });
+    } catch {
+      toast.error('Failed to send.', { id: toastId });
     } finally {
       setIsSending(false);
     }
@@ -232,8 +265,26 @@ export function ProposalGenerator() {
     updateCursor(null);
   }, [updateCursor]);
 
-  const handleEditContentChange = (value: string) => {
-    setEditContent(value);
+  const handleRegenerateSection = async (sectionId: string, sectionTitle: string) => {
+    if (!currentProposal) return;
+    setRegeneratingSectionId(sectionId);
+    const toastId = toast.loading(`Regenerating "${sectionTitle}"…`);
+    try {
+      const newContent = await ProposalService.regenerateSection(
+        sectionTitle,
+        currentProposal.input,
+        tone
+      );
+      updateSection(sectionId, newContent);
+      toast.success('Section regenerated.', { id: toastId });
+    } catch {
+      toast.error('Regeneration failed.', { id: toastId });
+    } finally {
+      setRegeneratingSectionId(null);
+    }
+  };
+
+  const handleEditContentChange = (value: string) => {    setEditContent(value);
     setIsDirty(true);
     // Auto-save after 2s of inactivity
     if (autoSaveTimerRef.current) clearTimeout(autoSaveTimerRef.current);
@@ -259,20 +310,24 @@ export function ProposalGenerator() {
   };
 
   const handleBulkDelete = () => {
+    const count = selectedIds.size;
     selectedIds.forEach(id => removeFromHistory(id));
     setSelectedIds(new Set());
+    toast.success(`Deleted ${count} proposal${count !== 1 ? 's' : ''}.`);
   };
 
   const handleShareProposal = async () => {
     if (!currentProposal) return;
     setIsSharing(true);
+    const toastId = toast.loading('Generating share link…');
     try {
       const link = await ProposalService.generateShareLink(currentProposal.id);
       const shareId = link.split('/').pop() || '';
       setShareId(currentProposal.id, shareId);
       setShareLink(link);
-    } catch (error) {
-      console.error('Share failed:', error);
+      toast.success('Share link ready.', { id: toastId });
+    } catch {
+      toast.error('Failed to generate link.', { id: toastId });
     } finally {
       setIsSharing(false);
     }
@@ -281,22 +336,21 @@ export function ProposalGenerator() {
   const handleCopyLink = () => {
     if (shareLink) {
       navigator.clipboard.writeText(shareLink);
-      setCopySuccess(true);
-      setTimeout(() => setCopySuccess(false), 2000);
+      toast.success('Link copied to clipboard.');
     }
   };
 
   const handleInviteCollaborator = async () => {
     if (!currentProposal || !collaboratorEmail) return;
     setIsInviting(true);
+    const toastId = toast.loading('Sending invitation…');
     try {
       await ProposalService.addCollaborator(currentProposal.id, collaboratorEmail);
       addCollaborator(currentProposal.id, collaboratorEmail);
-      setInviteSuccess(true);
       setCollaboratorEmail('');
-      setTimeout(() => setInviteSuccess(false), 3000);
-    } catch (error) {
-      console.error('Invite failed:', error);
+      toast.success('Invitation sent.', { id: toastId });
+    } catch {
+      toast.error('Failed to invite collaborator.', { id: toastId });
     } finally {
       setIsInviting(false);
     }
@@ -513,6 +567,7 @@ export function ProposalGenerator() {
                               size="icon"
                               onClick={() => remove(index)}
                               className="absolute top-4 right-4 h-8 w-8 rounded-full opacity-0 group-hover:opacity-100 transition-opacity hover:bg-destructive/10 hover:text-destructive"
+                              aria-label={`Delete requirement ${index + 1}`}
                             >
                               <Trash2 className="w-4 h-4" />
                             </Button>
@@ -527,15 +582,134 @@ export function ProposalGenerator() {
                                 placeholder="Describe the specific need or outcome..."
                                 className="min-h-[80px] border-none bg-transparent resize-none text-slate-600 placeholder:text-slate-400 focus-visible:ring-0 px-0"
                               />
+                              {/* Priority selector */}
+                              <div className="flex gap-2">
+                                {(['low', 'medium', 'high'] as const).map((p) => {
+                                  const current = watch(`requirements.${index}.priority`);
+                                  return (
+                                    <button
+                                      key={p}
+                                      type="button"
+                                      onClick={() => setValue(`requirements.${index}.priority`, p)}
+                                      className={cn(
+                                        'px-3 py-1 rounded-lg text-[10px] font-black uppercase tracking-widest transition-all',
+                                        current === p
+                                          ? p === 'high' ? 'bg-rose-100 text-rose-600'
+                                            : p === 'medium' ? 'bg-amber-100 text-amber-600'
+                                            : 'bg-slate-100 text-slate-500'
+                                          : 'bg-transparent text-slate-300 hover:text-slate-500'
+                                      )}
+                                    >
+                                      {p}
+                                    </button>
+                                  );
+                                })}
+                              </div>
                             </div>
                           </div>
                         ))}
                       </div>
                     </div>
+
+                    {/* Tone Selector */}
+                    <div className="space-y-4">
+                      <Label className="text-lg font-black text-slate-900">Writing Tone</Label>
+                      <div className="flex gap-3">
+                        {([
+                          { value: 'formal', label: 'Formal', desc: 'Executive-ready' },
+                          { value: 'casual', label: 'Casual', desc: 'Approachable' },
+                          { value: 'technical', label: 'Technical', desc: 'Detail-focused' },
+                        ] as const).map((t) => (
+                          <button
+                            key={t.value}
+                            type="button"
+                            onClick={() => setTone(t.value)}
+                            className={cn(
+                              'flex-1 p-4 rounded-2xl border-2 text-left transition-all',
+                              tone === t.value
+                                ? 'border-primary bg-primary/5'
+                                : 'border-slate-100 hover:border-slate-200'
+                            )}
+                          >
+                            <p className="font-black text-sm text-slate-900">{t.label}</p>
+                            <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mt-0.5">{t.desc}</p>
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+
+                    {/* Custom Section Builder */}
+                    <div className="space-y-4">
+                      <div className="flex items-center justify-between">
+                        <div>
+                          <Label className="text-lg font-black text-slate-900">Custom Sections</Label>
+                          <p className="text-xs text-slate-400 font-medium mt-0.5">Override template sections with your own</p>
+                        </div>
+                        {customSections.length > 0 && (
+                          <button
+                            type="button"
+                            onClick={() => setCustomSections([])}
+                            className="text-[10px] font-bold text-slate-400 hover:text-destructive uppercase tracking-widest"
+                          >
+                            Reset to template
+                          </button>
+                        )}
+                      </div>
+                      {customSections.length > 0 && (
+                        <div className="flex flex-wrap gap-2">
+                          {customSections.map((s, i) => (
+                            <div key={i} className="flex items-center gap-1.5 px-3 py-1.5 bg-primary/5 border border-primary/20 rounded-xl">
+                              <span className="text-xs font-bold text-primary">{s}</span>
+                              <button
+                                type="button"
+                                onClick={() => setCustomSections(prev => prev.filter((_, idx) => idx !== i))}
+                                className="text-primary/50 hover:text-primary"
+                              >
+                                <X className="w-3 h-3" />
+                              </button>
+                            </div>
+                          ))}
+                        </div>
+                      )}
+                      <div className="flex gap-2">
+                        <Input
+                          value={newSectionName}
+                          onChange={(e) => setNewSectionName(e.target.value)}
+                          onKeyDown={(e) => {
+                            if (e.key === 'Enter') {
+                              e.preventDefault();
+                              const trimmed = newSectionName.trim();
+                              if (trimmed && !customSections.includes(trimmed)) {
+                                setCustomSections(prev => [...prev, trimmed]);
+                                setNewSectionName('');
+                              }
+                            }
+                          }}
+                          placeholder="e.g. Security Considerations"
+                          className="h-10 rounded-xl border-slate-200 text-sm"
+                        />
+                        <Button
+                          type="button"
+                          variant="outline"
+                          size="sm"
+                          className="h-10 rounded-xl font-bold border-primary/20 text-primary"
+                          aria-label="Add custom section"
+                          onClick={() => {
+                            const trimmed = newSectionName.trim();
+                            if (trimmed && !customSections.includes(trimmed)) {
+                              setCustomSections(prev => [...prev, trimmed]);
+                              setNewSectionName('');
+                            }
+                          }}
+                        >
+                          <Plus className="w-4 h-4" />
+                        </Button>
+                      </div>
+                    </div>
                   </form>
                 </CardContent>
                 <CardFooter className="p-8 border-t bg-slate-50/30 flex justify-between items-center">
-                  <Button type="button" variant="ghost" onClick={() => resetForm()} className="font-bold text-slate-500 hover:text-slate-900">
+                  <Button type="button" variant="ghost" onClick={() => { resetForm(); try { localStorage.removeItem(DRAFT_KEY); } catch { /* ignore */ } }} className="font-bold text-slate-500 hover:text-slate-900">
                     Clear Form
                   </Button>
                   <Button 
@@ -721,9 +895,7 @@ export function ProposalGenerator() {
                                 {isInviting ? <Loader2 className="w-4 h-4 animate-spin" /> : <Mail className="w-4 h-4" />}
                               </Button>
                             </div>
-                            {inviteSuccess && <p className="text-xs font-bold text-emerald-500">Invitation sent!</p>}
-                          </div>
-                          <div className="space-y-3">
+                            </div>                          <div className="space-y-3">
                             <Label className="text-sm font-bold">Active Collaborators</Label>
                             <div className="space-y-2">
                               {(currentProposal.collaborators?.length ?? 0) > 0 ? (
@@ -770,7 +942,7 @@ export function ProposalGenerator() {
                               <div className="p-4 bg-slate-50 rounded-2xl border border-slate-100 flex items-center justify-between gap-4">
                                 <code className="text-xs font-mono text-slate-500 truncate flex-1">{shareLink}</code>
                                 <Button size="icon" variant="ghost" onClick={handleCopyLink} className="h-8 w-8 rounded-lg">
-                                  {copySuccess ? <CheckCircle2 className="w-4 h-4 text-emerald-500" /> : <Copy className="w-4 h-4" />}
+                                  <Copy className="w-4 h-4" />
                                 </Button>
                               </div>
                               <p className="text-[10px] text-slate-400 text-center">Anyone with this link can view the proposal.</p>
@@ -796,19 +968,17 @@ export function ProposalGenerator() {
                     <Button 
                       className={cn(
                         "h-12 px-6 rounded-xl font-bold text-white shadow-lg transition-all",
-                        sendSuccess ? "bg-emerald-500 hover:bg-emerald-600" : "bg-slate-900 hover:bg-slate-800"
+                        "bg-slate-900 hover:bg-slate-800"
                       )}
                       onClick={handleSendToClient}
-                      disabled={isSending || sendSuccess}
+                      disabled={isSending}
                     >
                       {isSending ? (
                         <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                      ) : sendSuccess ? (
-                        <CheckCircle2 className="w-4 h-4 mr-2" />
                       ) : (
                         <Send className="w-4 h-4 mr-2" />
                       )}
-                      {sendSuccess ? "Sent Successfully" : "Send to Client"}
+                      Send to Client
                     </Button>
                   </div>
                 </div>
@@ -907,14 +1077,30 @@ export function ProposalGenerator() {
                               )}
                               {currentProposal.template?.style !== 'minimal' && <div className="h-px flex-1 bg-slate-100" />}
                               {editingSectionId !== section.id && (
-                                <Button
-                                  variant="ghost"
-                                  size="icon"
-                                  onClick={() => handleStartEdit(section.id, section.content)}
-                                  className="h-8 w-8 rounded-full opacity-0 group-hover/section:opacity-100 transition-opacity pdf-hide"
-                                >
-                                  <Edit3 className="w-3.5 h-3.5" />
-                                </Button>
+                                <div className="flex gap-1 opacity-0 group-hover/section:opacity-100 transition-opacity pdf-hide">
+                                  <Button
+                                    variant="ghost"
+                                    size="icon"
+                                    onClick={() => handleStartEdit(section.id, section.content)}
+                                    className="h-8 w-8 rounded-full"
+                                    title="Edit section"
+                                  >
+                                    <Edit3 className="w-3.5 h-3.5" />
+                                  </Button>
+                                  <Button
+                                    variant="ghost"
+                                    size="icon"
+                                    onClick={() => handleRegenerateSection(section.id, section.title)}
+                                    disabled={regeneratingSectionId === section.id}
+                                    className="h-8 w-8 rounded-full"
+                                    title="Regenerate with AI"
+                                  >
+                                    {regeneratingSectionId === section.id
+                                      ? <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                                      : <Sparkles className="w-3.5 h-3.5" />
+                                    }
+                                  </Button>
+                                </div>
                               )}
                             </div>
                             
@@ -926,19 +1112,24 @@ export function ProposalGenerator() {
                                   className="min-h-[200px] text-lg font-medium leading-relaxed rounded-2xl border-primary/20 focus:ring-primary/10"
                                 />
                                 <div className="flex justify-between items-center">
-                                  <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">
-                                    {isDirty ? (
-                                      <span className="text-amber-500 flex items-center gap-1">
-                                        <span className="w-1.5 h-1.5 rounded-full bg-amber-500 animate-pulse inline-block" />
-                                        Unsaved changes
-                                      </span>
-                                    ) : (
-                                      <span className="text-emerald-500 flex items-center gap-1">
-                                        <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 inline-block" />
-                                        Saved
-                                      </span>
-                                    )}
-                                  </span>
+                                  <div className="flex items-center gap-4">
+                                    <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">
+                                      {isDirty ? (
+                                        <span className="text-amber-500 flex items-center gap-1">
+                                          <span className="w-1.5 h-1.5 rounded-full bg-amber-500 animate-pulse inline-block" />
+                                          Unsaved changes
+                                        </span>
+                                      ) : (
+                                        <span className="text-emerald-500 flex items-center gap-1">
+                                          <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 inline-block" />
+                                          Saved
+                                        </span>
+                                      )}
+                                    </span>
+                                    <span className="text-[10px] text-slate-300 font-bold">
+                                      {editContent.length} chars · {editContent.trim() ? editContent.trim().split(/\s+/).length : 0} words
+                                    </span>
+                                  </div>
                                   <div className="flex gap-2">
                                     <Button variant="ghost" size="sm" onClick={handleCancelEdit} className="rounded-lg font-bold">
                                       <X className="w-4 h-4 mr-2" /> Cancel <span className="ml-1 text-[10px] opacity-50">Esc</span>
@@ -1051,6 +1242,9 @@ export function ProposalGenerator() {
               </div>
             </CardHeader>
             <CardContent className="p-8">
+              {historyLoading ? (
+                <HistorySkeleton />
+              ) : (
               <ScrollArea className="h-[50vh]">
                 {filteredHistory.length === 0 ? (
                   <div className="flex flex-col items-center justify-center py-24 text-slate-400">
@@ -1190,6 +1384,7 @@ export function ProposalGenerator() {
                   </div>
                 )}
               </ScrollArea>
+              )}
             </CardContent>
           </Card>
         </TabsContent>

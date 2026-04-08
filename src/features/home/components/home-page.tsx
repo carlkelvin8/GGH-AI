@@ -3,6 +3,7 @@
 import { useEffect, useState } from 'react';
 import { Terminal, Shield, Zap, Wand2, ArrowRight, Sparkles } from 'lucide-react';
 import { ProposalGenerator } from '@/features/proposal/components/proposal-generator';
+import { ErrorBoundary } from '@/shared/components/error-boundary';
 import {
   Dialog,
   DialogContent,
@@ -105,7 +106,9 @@ export function HomePage() {
                     </DialogDescription>
                   </DialogHeader>
                   <div className="flex-1 overflow-y-auto p-8 custom-scrollbar">
-                    <ProposalGenerator />
+                    <ErrorBoundary>
+                      <ProposalGenerator />
+                    </ErrorBoundary>
                   </div>
                 </div>
               </DialogContent>
@@ -118,6 +121,7 @@ export function HomePage() {
 
           {/* Features Grid */}
           <div className="grid grid-cols-1 md:grid-cols-3 gap-8 w-full pt-16 animate-in fade-in slide-in-from-bottom-16 duration-1000">
+            <h2 className="sr-only">Key Features</h2>
             <FeatureCard
               icon={<Terminal className="w-8 h-8 text-primary" />}
               title="OpenClaw Agentic Flow"
@@ -138,13 +142,13 @@ export function HomePage() {
 
         {/* Footer */}
         <footer className="mt-32 pt-12 border-t border-slate-200/60 text-center space-y-4">
-          <div className="flex justify-center gap-8 text-slate-400 font-bold text-sm">
+          <div className="flex justify-center gap-8 text-slate-500 font-bold text-sm">
             <span>Next.js 14+</span>
             <span>TypeScript</span>
             <span>TanStack Query</span>
             <span>Zustand</span>
           </div>
-          <p className="text-slate-400 font-medium italic">
+          <p className="text-slate-500 font-medium italic">
             &copy; {new Date().getFullYear()} GGH Software Development Services &mdash; Proposals that win.
           </p>
         </footer>

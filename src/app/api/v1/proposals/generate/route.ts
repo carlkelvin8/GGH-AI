@@ -14,6 +14,12 @@ function buildPrompt(input: ProposalInput, templateName: string, sections: strin
     .map((r) => `- [${r.priority.toUpperCase()}] ${r.title}: ${r.description}`)
     .join('\n');
 
+  const toneGuide = {
+    formal: 'Use formal, professional language suitable for executive stakeholders.',
+    casual: 'Use approachable, conversational language while remaining professional.',
+    technical: 'Use precise technical language with specific implementation details and terminology.',
+  }[input.tone ?? 'formal'];
+
   return `You are an expert proposal writer for GGH Software Development Services.
 Generate a professional project proposal with EXACTLY these sections in order: ${sections.join(', ')}.
 
@@ -22,6 +28,7 @@ Project: ${input.projectTitle}
 ${input.budgetRange ? `Budget: ${input.budgetRange}` : ''}
 ${input.timeline ? `Timeline: ${input.timeline}` : ''}
 Template style: ${templateName}
+Tone: ${toneGuide}
 
 Requirements:
 ${requirementsList}
@@ -36,7 +43,13 @@ Rules:
 }
 
 export async function POST(request: Request) {
-  const body = await request.json();
+  let body;
+  try {
+    body = await request.json();
+  } catch (error) {
+    return Response.json({ error: 'Invalid JSON in request body' }, { status: 400 });
+  }
+  
   const parsed = ProposalInputSchema.safeParse(body);
 
   if (!parsed.success) {
@@ -45,6 +58,10 @@ export async function POST(request: Request) {
 
   const input = parsed.data;
   const template = PROPOSAL_TEMPLATES.find((t) => t.id === input.templateId) ?? PROPOSAL_TEMPLATES[0];
+  // Use custom sections if provided, otherwise fall back to template defaults
+  const sections = (input.customSections && input.customSections.length > 0)
+    ? input.customSections
+    : template.sections;
 
   const encoder = new TextEncoder();
 
@@ -73,7 +90,7 @@ export async function POST(request: Request) {
           temperature: 0.7,
           response_format: { type: 'json_object' },
           messages: [
-            { role: 'system', content: buildPrompt(input, template.name, template.sections) },
+            { role: 'system', content: buildPrompt(input, template.name, sections) },
             { role: 'user', content: 'Generate the proposal now.' },
           ],
         });
@@ -89,7 +106,7 @@ export async function POST(request: Request) {
         const parsed = JSON.parse(raw) as { sections: { title: string; content: string }[] };
 
         // Map LLM sections to our schema, filling gaps if the model missed any
-        const sections = template.sections.map((title) => {
+        const sectionResults = sections.map((title) => {
           const match = parsed.sections?.find(
             (s) => s.title.toLowerCase().trim() === title.toLowerCase().trim()
           );
@@ -103,7 +120,7 @@ export async function POST(request: Request) {
         const proposal = ProposalSchema.parse({
           id: crypto.randomUUID(),
           input,
-          sections,
+          sections: sectionResults,
           generatedAt: new Date().toISOString(),
           status: 'draft',
           template,
